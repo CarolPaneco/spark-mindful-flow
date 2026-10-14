@@ -17,8 +17,12 @@ import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
 import { CaptureSheet } from '@/components/capture-sheet';
 import { AiChatSheet } from '@/components/ai-chat-sheet';
+import { ProfileSidebar } from '@/components/profile-sidebar';
+import { IdeaDetail } from '@/components/idea-detail';
+import { AuthModal } from '@/components/auth-modal';
 import avatar from '@/assets/ideaflow-avatar.png';
 import { Idea } from '@/lib/ideaflow';
+import { User, LogIn, Cloud, CloudCheck, RefreshCw } from 'lucide-react';
 
 const navigation = [
   { to: '/', name: 'Funil', icon: Layers3 },
@@ -28,9 +32,12 @@ const navigation = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { data, setData } = useFlow();
+  const { data, setData, user, profile, isSyncing, syncWithCloud } = useFlow();
   const [capture, setCapture] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [authOpen, setAuthOpen] = useState(false);
+  const [profileIdeaId, setProfileIdeaId] = useState<string | null>(null);
   const [mentorIdea, setMentorIdea] = useState<Idea | null>(null);
   const [greeting, setGreeting] = useState('Que bom ter você aqui');
   const [online, setOnline] = useState(true);
@@ -54,11 +61,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
     window.addEventListener('ideaflow:mentor', mentorEvent);
 
+    const profileEvent = () => setProfileOpen(true);
+    window.addEventListener('ideaflow:profile', profileEvent);
+
+    const loginEvent = () => setAuthOpen(true);
+    window.addEventListener('ideaflow:login', loginEvent);
+
     return () => {
       window.removeEventListener('online', sync);
       window.removeEventListener('offline', sync);
       window.removeEventListener('ideaflow:capture', captureEvent);
       window.removeEventListener('ideaflow:mentor', mentorEvent);
+      window.removeEventListener('ideaflow:profile', profileEvent);
+      window.removeEventListener('ideaflow:login', loginEvent);
     };
   }, []);
 
@@ -109,8 +124,62 @@ export function AppShell({ children }: { children: ReactNode }) {
               {data.theme === 'dark' ? <Sun /> : <Moon />}
             </Button>
 
+            {/* Botão de Login ou Status da Conta */}
+            {user ? (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground hidden sm:flex"
+                  onClick={() => syncWithCloud()}
+                  disabled={isSyncing}
+                  title="Sincronizar com o banco de dados seguro Supabase"
+                >
+                  <RefreshCw size={12} className={isSyncing ? 'animate-spin text-primary' : 'text-green'} />
+                  <span className="text-[11px] font-mono">{user.email?.split('@')[0]}</span>
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 border-primary/40 bg-card hover:bg-primary/10 text-foreground"
+                onClick={() => setAuthOpen(true)}
+                title="Entrar ou criar conta gratuita para sincronizar ideias"
+              >
+                <LogIn size={13} className="text-primary" />
+                <span className="hidden sm:inline font-medium">Entrar / Cadastrar</span>
+                <span className="sm:hidden font-medium">Entrar</span>
+              </Button>
+            )}
+
+            {/* Barra lateral discreta de perfil */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground hidden sm:flex"
+              onClick={() => setProfileOpen(true)}
+              title="Abrir barra lateral do perfil e ideias arquivadas"
+            >
+              <User size={13} className="text-primary" />
+              <span>Perfil</span>
+              {data.ideas.some(i => i.archived) && (
+                <span className="text-[10px] bg-secondary/80 text-muted-foreground px-1.5 py-0.2 rounded-full font-mono">
+                  {data.ideas.filter(i => i.archived).length}
+                </span>
+              )}
+            </Button>
+
             <span className="header-divider" />
-            <img src={avatar} alt="Avatar holográfico" className="avatar" width={44} height={44} />
+            <button
+              type="button"
+              onClick={() => (user ? setProfileOpen(true) : setAuthOpen(true))}
+              className="avatar-trigger relative rounded-full cursor-pointer transition-transform hover:scale-105 focus:outline-none"
+              title={user ? 'Abrir Meu Perfil' : 'Fazer Login / Cadastrar'}
+              aria-label="Perfil do Usuário"
+            >
+              <img src={avatar} alt="Avatar holográfico" className="avatar hover:ring-2 hover:ring-primary/60 transition-all" width={44} height={44} />
+            </button>
           </div>
         </div>
       </header>
@@ -171,6 +240,22 @@ export function AppShell({ children }: { children: ReactNode }) {
         onClose={() => setAiChatOpen(false)}
         initialIdea={mentorIdea}
       />
+      <ProfileSidebar
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        onOpenIdea={id => setProfileIdeaId(id)}
+      />
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+      />
+      {profileIdeaId && (
+        <IdeaDetail
+          ideaId={profileIdeaId}
+          onClose={() => setProfileIdeaId(null)}
+          onFocus={() => setProfileIdeaId(null)}
+        />
+      )}
     </div>
   );
 }

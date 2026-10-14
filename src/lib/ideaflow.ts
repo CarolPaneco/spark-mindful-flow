@@ -49,6 +49,17 @@ export interface Idea {
   notes?: IdeaNote[] | undefined;
   targetDate?: string | undefined;
   dueDate?: string | undefined;
+  parentId?: string | undefined; // ID do projeto macro pai (aninhamento)
+  isProject?: boolean | undefined; // Se esta ideia é um projeto macro com sub-módulos
+  archived?: boolean | undefined; // Se esta ideia foi arquivada
+  archivedAt?: string | undefined; // Data do arquivamento
+}
+
+export interface UserProfile {
+  name: string;
+  role: string;
+  bio?: string;
+  streak: number;
 }
 
 export interface FlowData {
@@ -56,6 +67,7 @@ export interface FlowData {
   sectors: Sector[];
   theme: 'dark' | 'light';
   palette: string;
+  profile?: UserProfile;
 }
 
 export const stageNames = ['Faísca', 'Estrutura', 'Em Fluxo', 'Ajustes', 'Realidade'];
@@ -80,7 +92,10 @@ const makeIdea = (
   priority: Idea['priority'] = 'Normal',
   scope?: string,
   pivots?: PivotRecord[],
-  notes?: IdeaNote[]
+  notes?: IdeaNote[],
+  parentId?: string,
+  isProject?: boolean,
+  archived?: boolean
 ): Idea => {
   const steps: Step[] = [
     'Definir objetivo e resultado em 1 frase',
@@ -115,12 +130,21 @@ const makeIdea = (
         text: 'Ideia inicial validada com ótimas perspectivas. Próximo passo é focar no essencial.',
       },
     ],
+    parentId,
+    isProject,
+    archived,
   };
 };
 
 export const seedData = (): FlowData => ({
   theme: 'dark',
   palette: 'Aurora',
+  profile: {
+    name: 'Explorador Ideaflow',
+    role: 'Criador & Desenvolvedor',
+    bio: 'Transformando ideias em realidade, um passo consciente de cada vez.',
+    streak: 6,
+  },
   sectors: initialSectors.map(s => ({ ...s })),
   ideas: [
     makeIdea(
@@ -214,12 +238,46 @@ export const seedData = (): FlowData => ({
     ),
     makeIdea(
       'demo-7',
-      'Tirar a loja online do papel',
-      'Ajustar os últimos detalhes antes de abrir as portas para o público.',
+      'Tirar a loja online do papel (Projeto Macro)',
+      'Plano completo de e-commerce integrando catálogo e pagamentos.',
+      'business',
+      2,
+      240,
+      2,
+      'Importante',
+      'Projeto macro contendo módulos de Front-end, Back-end e Lançamento.',
+      undefined,
+      undefined,
+      undefined,
+      true // isProject
+    ),
+    makeIdea(
+      'demo-7-front',
+      'Loja: Front-end & Vitrine de Produtos',
+      'Catálogo interativo, carrinho de compras e design responsivo.',
       'business',
       3,
-      90,
-      3
+      120,
+      3,
+      'Normal',
+      'Interface do usuário para o e-commerce.',
+      undefined,
+      undefined,
+      'demo-7' // parentId
+    ),
+    makeIdea(
+      'demo-7-back',
+      'Loja: Back-end & Gateway de Pagamentos',
+      'Integração com Mercado Pago/Stripe, cálculo de frete e pedidos.',
+      'business',
+      2,
+      120,
+      2,
+      'Urgente',
+      'Serviços e APIs de suporte à loja online.',
+      undefined,
+      undefined,
+      'demo-7' // parentId
     ),
     makeIdea(
       'demo-8',
@@ -229,6 +287,22 @@ export const seedData = (): FlowData => ({
       4,
       60,
       4
+    ),
+    makeIdea(
+      'demo-archived-1',
+      'Protótipo em papel da ideia antiga v0',
+      'Ideia arquivada para manter o histórico sem poluir o funil principal.',
+      'tech',
+      1,
+      45,
+      1,
+      'Normal',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false,
+      true // archived
     ),
   ],
 });
@@ -773,4 +847,256 @@ export function isFlowData(input: unknown): input is FlowData {
         i.steps.every(s => typeof s.text === 'string' && typeof s.done === 'boolean' && Number.isFinite(s.minutes) && s.minutes >= 0)
     )
   );
+}
+
+/**
+ * Retorna as sub-ideias (módulos) vinculadas a um projeto pai.
+ */
+export function getSubIdeas(ideas: Idea[], parentId: string, includeArchived = false): Idea[] {
+  return ideas.filter(i => i.parentId === parentId && (includeArchived || !i.archived));
+}
+
+/**
+ * Retorna a ideia/projeto pai de uma determinada sub-ideia.
+ */
+export function getParentIdea(ideas: Idea[], idea: Idea): Idea | undefined {
+  if (!idea.parentId) return undefined;
+  return ideas.find(i => i.id === idea.parentId);
+}
+
+/**
+ * Calcula métricas agregadas de um projeto macro com seus módulos.
+ */
+export function getProjectStats(projectIdea: Idea, allIdeas: Idea[]): {
+  totalSub: number;
+  completedSub: number;
+  percent: number;
+  totalMinutes: number;
+  dedicatedMinutes: number;
+} {
+  const subIdeas = getSubIdeas(allIdeas, projectIdea.id, false);
+  if (subIdeas.length === 0) {
+    const completedSteps = projectIdea.steps.filter(s => s.done).length;
+    const totalSteps = projectIdea.steps.length;
+    return {
+      totalSub: 0,
+      completedSub: 0,
+      percent: totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0,
+      totalMinutes: projectIdea.minutes,
+      dedicatedMinutes: projectIdea.dedicated,
+    };
+  }
+
+  const completedSub = subIdeas.filter(i => i.stage === 4).length;
+  const percent = Math.round((completedSub / subIdeas.length) * 100);
+  const totalMinutes = subIdeas.reduce((sum, i) => sum + i.minutes, projectIdea.minutes);
+  const dedicatedMinutes = subIdeas.reduce((sum, i) => sum + i.dedicated, projectIdea.dedicated);
+
+  return {
+    totalSub: subIdeas.length,
+    completedSub,
+    percent,
+    totalMinutes,
+    dedicatedMinutes,
+  };
+}
+
+/**
+ * Detecta o setor ideal com base no título e texto da ideia/projeto.
+ */
+export function detectSectorFromTitle(text: string, sectors: Sector[]): string {
+  const lower = text.toLowerCase();
+  
+  if (/cozinha|reforma|quarto|casa|apartamento|banheiro|obra|pintura|sala|parede|telhado|jardim|encanamento|elétrica/.test(lower)) {
+    // Se existir setor de marcenaria/casa ou pessoal
+    const woodOrHome = sectors.find(s => s.id === 'wood' || s.id === 'personal');
+    return woodOrHome?.id ?? 'personal';
+  }
+
+  if (/bolo|receita|comida|culinária|jantar|almoço|avó|família|viagem|férias|saúde|hábito|treino|academia|dieta|dormir|leitura|livro|meditação/.test(lower)) {
+    const personal = sectors.find(s => s.id === 'personal');
+    return personal?.id ?? 'personal';
+  }
+
+  if (/marcenaria|madeira|móvel|móveis|mesa|cadeira|estante|oficina|artesanato|serra|lixa/.test(lower)) {
+    const wood = sectors.find(s => s.id === 'wood');
+    return wood?.id ?? 'wood';
+  }
+
+  if (/vendas|loja|cliente|faturamento|financeiro|investimento|marketing|empresa|startup|negócio|produto|preço|lucro/.test(lower)) {
+    const biz = sectors.find(s => s.id === 'business');
+    return biz?.id ?? 'business';
+  }
+
+  if (/site|app|software|sistema|código|api|programação|frontend|backend|banco de dados|tecnologia|computador/.test(lower)) {
+    const tech = sectors.find(s => s.id === 'tech');
+    return tech?.id ?? 'tech';
+  }
+
+  return sectors[0]?.id ?? 'personal';
+}
+
+/**
+ * Gera sugestões inteligentes de módulos/sub-ideias com base no escopo e setor.
+ */
+export function generateSubModulesAi(
+  projectTitle: string,
+  projectSummary: string,
+  sectorId: string
+): { title: string; summary: string; minutes: number }[] {
+  const lower = `${projectTitle} ${projectSummary} ${sectorId}`.toLowerCase();
+
+  // 1. Reformas, Construção, Decoração e Casa (ex: Reformar minha cozinha)
+  if (/reforma|cozinha|quarto|casa|apartamento|banheiro|obra|pintura|sala|parede|telhado|azulejo|piso|encanamento|elétrica/.test(lower)) {
+    return [
+      {
+        title: `${projectTitle}: Planejamento & Orçamento`,
+        summary: 'Definir estilo, listar materiais, cotar fornecedores e estabelecer limite financeiro.',
+        minutes: 60,
+      },
+      {
+        title: `${projectTitle}: Demolição, Alvenaria & Infraestrutura`,
+        summary: 'Remoção de móveis antigos, ajustes de pontos hidráulicos, tomadas elétricas e revestimentos.',
+        minutes: 180,
+      },
+      {
+        title: `${projectTitle}: Marcenaria, Bancadas & Iluminação`,
+        summary: 'Instalação de armários sob medida, bancadas de pedra e fitas LED/luminárias focais.',
+        minutes: 120,
+      },
+      {
+        title: `${projectTitle}: Pintura, Eletros & Decoração Final`,
+        summary: 'Pintura lavável, instalação dos eletrodomésticos e organização dos utensílios.',
+        minutes: 90,
+      },
+    ];
+  }
+
+  // 2. Culinária, Gastronomia, Festas e Visitas Afetuosas
+  if (/bolo|receita|cenoura|cozinha|culinária|jantar|almoço|doce|festa|aniversário|avó|família/.test(lower)) {
+    return [
+      {
+        title: `${projectTitle}: Ingredientes & Utensílios`,
+        summary: 'Conferir despensa, comprar insumos frescos de qualidade e separar fôrmas/utensílios.',
+        minutes: 45,
+      },
+      {
+        title: `${projectTitle}: Preparo & Ponto de Cocção`,
+        summary: 'Executar a receita com atenção aos tempos de forno e textura ideal da massa.',
+        minutes: 75,
+      },
+      {
+        title: `${projectTitle}: Cobertura, Recheio & Decoração`,
+        summary: 'Preparar a calda especial (ex: chocolate brilhante) e finalizar a apresentação.',
+        minutes: 40,
+      },
+      {
+        title: `${projectTitle}: Embalagem & Encontro/Celebração`,
+        summary: 'Embalar com carinho e desfrutar do momento especial junto com quem você ama.',
+        minutes: 30,
+      },
+    ];
+  }
+
+  // 3. Marcenaria e Artesanato Físico
+  if (/marcenaria|madeira|móvel|móveis|mesa|cadeira|estante|oficina|artesanato/.test(lower)) {
+    return [
+      {
+        title: `${projectTitle}: Projeto Técnico & Medidas`,
+        summary: 'Desenho detalhado com cotas, espessuras e plano de corte otimizado.',
+        minutes: 60,
+      },
+      {
+        title: `${projectTitle}: Preparação & Aparelhamento`,
+        summary: 'Seleção das peças de madeira, corte preliminar e desempeno das faces.',
+        minutes: 90,
+      },
+      {
+        title: `${projectTitle}: Usinagem, Encaixes & Montagem`,
+        summary: 'Execução de cavilhas, encaixes tradicionais e colagem estrutural.',
+        minutes: 180,
+      },
+      {
+        title: `${projectTitle}: Lixamento & Acabamento Final`,
+        summary: 'Lixamento progressivo dos grãos e aplicação de óleo mineral ou verniz protetor.',
+        minutes: 90,
+      },
+    ];
+  }
+
+  // 4. Tecnologia, Apps, Plataformas e Websites
+  if (/site|vendas|loja|ecommerce|e-commerce|web|plataforma|app|aplicativo|software|api|saas/.test(lower)) {
+    return [
+      {
+        title: `${projectTitle}: Interface & Front-end`,
+        summary: 'Construir a experiência visual, componentes responsivos e fluxos de navegação.',
+        minutes: 120,
+      },
+      {
+        title: `${projectTitle}: API & Back-end`,
+        summary: 'Estruturar o banco de dados, regras de negócio e serviços de autenticação.',
+        minutes: 150,
+      },
+      {
+        title: `${projectTitle}: Checkout & Pagamentos`,
+        summary: 'Configurar gateway de pagamentos, validações de pedidos e confirmações por e-mail.',
+        minutes: 90,
+      },
+      {
+        title: `${projectTitle}: Marketing & Lançamento`,
+        summary: 'Preparar página de captura, lista de espera e primeiros canais de aquisição.',
+        minutes: 60,
+      },
+    ];
+  }
+
+  // 5. Saúde, Hábitos Pessoais, Estudos ou Treinos
+  if (/saúde|exercício|corrida|treino|academia|dieta|hábito|estudos|leitura|livro|meditação/.test(lower)) {
+    return [
+      {
+        title: `${projectTitle}: Definição de Rotina & Metas`,
+        summary: 'Definir horários realistas, métricas semanais e gatilhos de consistência.',
+        minutes: 30,
+      },
+      {
+        title: `${projectTitle}: Preparação do Ambiente & Recursos`,
+        summary: 'Separar materiais, roupas de treino, livros ou aplicativos de apoio.',
+        minutes: 45,
+      },
+      {
+        title: `${projectTitle}: Ciclo Inicial de Prática (7 Dias)`,
+        summary: 'Executar os primeiros dias com foco em disciplina e sem cobrança de perfeição.',
+        minutes: 90,
+      },
+      {
+        title: `${projectTitle}: Avaliação de Progresso & Ajustes`,
+        summary: 'Revisar como o corpo/mente respondeu e adaptar para manter no longo prazo.',
+        minutes: 30,
+      },
+    ];
+  }
+
+  // Fallback geral estruturado e humano (sem viés puramente tecnológico)
+  return [
+    {
+      title: `${projectTitle}: Fase 1 - Planejamento & Recursos`,
+      summary: 'Mapear requisitos, levantar referências e separar tudo o que é necessário para começar.',
+      minutes: 60,
+    },
+    {
+      title: `${projectTitle}: Fase 2 - Execução do Núcleo Principal`,
+      summary: 'Colocar a mão na massa na parte mais importante que torna o projeto real.',
+      minutes: 120,
+    },
+    {
+      title: `${projectTitle}: Fase 3 - Ajustes, Detalhes & Acabamento`,
+      summary: 'Polir arestas, testar na prática e refinar o resultado final.',
+      minutes: 60,
+    },
+    {
+      title: `${projectTitle}: Fase 4 - Entrega, Uso Real ou Celebração`,
+      summary: 'Colocar em uso diário, apresentar para quem importa ou comemorar a conclusão.',
+      minutes: 45,
+    },
+  ];
 }

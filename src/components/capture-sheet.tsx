@@ -206,7 +206,23 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
 
           {!draft ? (
             <>
-              <div className="segmented mt-6">
+              <div className="mt-4 p-2.5 rounded-lg border border-violet/30 bg-violet/5 flex items-center justify-between text-xs text-muted-foreground">
+                <span>Quer criar um <strong>Projeto com várias ideias dentro</strong>?</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-violet font-semibold hover:bg-violet/10 px-2 gap-1 cursor-pointer"
+                  onClick={() => {
+                    onClose();
+                    window.dispatchEvent(new Event('ideaflow:create-project'));
+                  }}
+                >
+                  <span>Criar Projeto</span>
+                  <ArrowRight size={12} />
+                </Button>
+              </div>
+
+              <div className="segmented mt-4">
                 <Button variant="ghost" className={tab === 'voice' ? 'selected' : ''} onClick={() => setTab('voice')}>
                   <Mic size={16} />
                   Gravar áudio
@@ -343,6 +359,33 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                     ))}
                   </select>
                 </label>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted-foreground font-medium mb-1 block">
+                  Vincular a um Projeto Existente (Opcional)
+                </label>
+                <select
+                  className="text-xs"
+                  value={draft.parentId ?? ''}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setDraft({
+                      ...draft,
+                      parentId: val || undefined,
+                      sector: val ? (data.ideas.find(i => i.id === val)?.sector ?? draft.sector) : draft.sector,
+                    });
+                  }}
+                >
+                  <option value="">Nenhum (Ideia independente / avulsa)</option>
+                  {data.ideas
+                    .filter(i => !i.archived && (i.isProject || data.ideas.some(sub => sub.parentId === i.id)))
+                    .map(p => (
+                      <option key={p.id} value={p.id}>
+                        📁 {p.title}
+                      </option>
+                    ))}
+                </select>
               </div>
 
               <div>

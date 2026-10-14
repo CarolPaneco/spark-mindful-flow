@@ -72,8 +72,8 @@ function Today() {
     );
   }, []);
 
-  const scheduled = date ? data.ideas.filter(i => i.day === date) : [];
-  const ready = data.ideas.filter(i => i.stage > 0 && i.stage < 4 && i.day !== date);
+  const scheduled = date ? data.ideas.filter(i => !i.archived && i.day === date) : [];
+  const ready = data.ideas.filter(i => !i.archived && i.stage > 0 && i.stage < 4 && i.day !== date);
 
   // Lógica para montar a matriz de dias do calendário
   const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1).getDay();
@@ -103,7 +103,7 @@ function Today() {
 
   const handleReschedulePending = () => {
     const todayStr = localDate();
-    const overdue = data.ideas.filter(i => i.day && i.day < todayStr && i.stage < 4);
+    const overdue = data.ideas.filter(i => !i.archived && i.day && i.day < todayStr && i.stage < 4);
     if (overdue.length === 0) {
       toast.info('Nenhuma ideia pendente de dias anteriores.');
       return;
@@ -226,7 +226,7 @@ function Today() {
               const formattedDate = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
               const isSelected = date === formattedDate;
               const isToday = formattedDate === localDate();
-              const dayIdeas = data.ideas.filter(idea => idea.day === formattedDate);
+              const dayIdeas = data.ideas.filter(idea => !idea.archived && idea.day === formattedDate);
 
               return (
                 <button

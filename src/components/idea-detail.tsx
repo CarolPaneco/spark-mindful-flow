@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
+  ArrowLeft,
   Check,
   CheckCircle2,
   Clock3,
@@ -22,6 +23,10 @@ import {
   History,
   Pencil,
   CheckSquare,
+  FolderTree,
+  Archive,
+  ArchiveRestore,
+  Layers,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -36,6 +41,10 @@ import {
   getAiCoachingInsights,
   createGoogleCalendarUrl,
   downloadIcsFile,
+  getSubIdeas,
+  getParentIdea,
+  getProjectStats,
+  generateSubModulesAi,
   type Idea,
   type Stage,
   type Step,
@@ -43,9 +52,10 @@ import {
   type IdeaNote,
   type DayBlock,
 } from '@/lib/ideaflow';
+import { generateProjectModulesWithGemini } from '@/lib/ai-assistant';
 import { toast } from 'sonner';
 
-type Tab = 'overview' | 'steps' | 'pivots' | 'notes' | 'calendar' | 'coach';
+type Tab = 'overview' | 'steps' | 'subideas' | 'pivots' | 'notes' | 'calendar' | 'coach';
 
 export function IdeaDetail({
   ideaId,
@@ -59,6 +69,7 @@ export function IdeaDetail({
   const { data, updateIdea, setData } = useFlow();
   const [tab, setTab] = useState<Tab>('overview');
   const [mounted, setMounted] = useState(false);
+  const [currentIdeaId, setCurrentIdeaId] = useState<string | null>(ideaId);
 
   // Estados para Mudança de Rota (Pivô)
   const [showPivotForm, setShowPivotForm] = useState(false);
@@ -74,19 +85,32 @@ export function IdeaDetail({
   const [newStepMinutes, setNewStepMinutes] = useState(15);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
 
+  // Estados para Sub-ideias / Módulos de Projetos Complexos
+  const [showSubIdeaForm, setShowSubIdeaForm] = useState(false);
+  const [subIdeaTitle, setSubIdeaTitle] = useState('');
+  const [subIdeaSummary, setSubIdeaSummary] = useState('');
+  const [subIdeaMinutes, setSubIdeaMinutes] = useState(60);
+  const [subIdeaPriority, setSubIdeaPriority] = useState<Idea['priority']>('Normal');
+  const [isGeneratingSubAi, setIsGeneratingSubAi] = useState(false);
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const idea = data.ideas.find(i => i.id === ideaId);
+  useEffect(() => {
+    setCurrentIdeaId(ideaId);
+  }, [ideaId]);
+
+  const idea = data.ideas.find(i => i.id === currentIdeaId);
 
   useEffect(() => {
     if (idea) {
       setNewScope(idea.scope ?? '');
       setShowPivotForm(false);
       setEditingStepIndex(null);
+      setShowSubIdeaForm(false);
     }
-  }, [ideaId]);
+  }, [currentIdeaId]);
 
   if (!idea) {
     return (
@@ -205,6 +229,171 @@ export function IdeaDetail({
     toast.success('Anotação removida.');
   };
 
+  // Sub-ideias e Projetos Complexos
+  const subIdeas = idea ? getSubIdeas(data.ideas, idea.id, true) : [];
+  const activeSubIdeas = subIdeas.filter(s => !s.archived);
+  const projectStats = idea ? getProjectStats(idea, data.ideas) : { totalSub: 0, completedSub: 0, percent: 0, totalMinutes: 0, dedicatedMinutes: 0 };
+  const parentIdea = idea ? getParentIdea(data.ideas, idea) : undefined;
+
+  const handleCreateSubIdea = () => {
+    if (!subIdeaTitle.trim()) {
+      toast.error('Informe o título do módulo ou sub-ideia.');
+      return;
+    }
+    const newSubIdea: Idea = {
+      id: crypto.randomUUID(),
+      title: subIdeaTitle.trim(),
+      summary: subIdeaSummary.trim() || `Módulo especializado do projeto ${idea.title}`,
+      sector: idea.sector,
+      stage: 0,
+      minutes: Number(subIdeaMinutes) || 60,
+      dedicated: 0,
+      priority: subIdeaPriority,
+      parentId: idea.id,
+      steps: [
+        {
+          id: crypto.randomUUID(),
+          text: `Definir resultado e escopo de “${subIdeaTitle.trim()}”`,
+          minutes: 15,
+          done: false,
+        },
+        {
+          id: crypto.randomUUID(),
+          text: `Implementar a entrega principal do módulo`,
+          minutes: Math.max(15, (Number(subIdeaMinutes) || 60) - 30),
+          done: false,
+        },
+        {
+          id: crypto.randomUUID(),
+          text: `Testar e validar no projeto geral`,
+          minutes: 15,
+          done: false,
+        },
+      ],
+      immediate: `Definir resultado e escopo de “${subIdeaTitle.trim()}”`,
+      clarity: 'Módulo de projeto estruturado com foco em entrega incremental.',
+      pivots: [],
+      notes: [],
+    };
+
+    setData(prev => ({
+      ...prev,
+      ideas: [newSubIdea, ...prev.ideas.map(i => (i.id === idea.id ? { ...i, isProject: true } : i))],
+    }));
+
+    setSubIdeaTitle('');
+    setSubIdeaSummary('');
+    setShowSubIdeaForm(false);
+    toast.success('Módulo adicionado ao projeto! 🚀');
+  };
+
+  const handleGenerateAiSubModules = async () => {
+    setIsGeneratingSubAi(true);
+    try {
+      const res = await generateProjectModulesWithGemini(idea.title, idea.summary, idea.sector);
+      const modules = res.modules;
+      const newSubIdeas: Idea[] = modules.map(m => ({
+        id: crypto.randomUUID(),
+        title: m.title,
+        summary: m.summary,
+        sector: idea.sector,
+        stage: 0,
+        minutes: m.minutes,
+        dedicated: 0,
+        priority: 'Normal',
+        parentId: idea.id,
+        steps: [
+          {
+            id: crypto.randomUUID(),
+            text: `Planejar estrutura de ${m.title}`,
+            minutes: 15,
+            done: false,
+          },
+          {
+            id: crypto.randomUUID(),
+            text: `Construir implementação prática`,
+            minutes: Math.max(15, m.minutes - 30),
+            done: false,
+          },
+          {
+            id: crypto.randomUUID(),
+            text: `Revisar e integrar ao projeto macro`,
+            minutes: 15,
+            done: false,
+          },
+        ],
+        immediate: `Planejar estrutura de ${m.title}`,
+        clarity: 'Módulo inteligente desenhado para decompor a complexidade da ideia.',
+        pivots: [],
+        notes: [],
+      }));
+
+      setData(prev => ({
+        ...prev,
+        ideas: [...newSubIdeas, ...prev.ideas.map(i => (i.id === idea.id ? { ...i, isProject: true } : i))],
+      }));
+
+      if (res.usedGemini) {
+        toast.success(`Google Gemini gerou ${newSubIdeas.length} módulos personalizados para seu projeto! ✨`);
+      } else {
+        toast.success(`Motor Local gerou ${newSubIdeas.length} módulos para seu projeto! ✨`);
+      }
+    } catch {
+      const fallback = generateSubModulesAi(idea.title, idea.summary, idea.sector);
+      const newSubIdeas: Idea[] = fallback.map(m => ({
+        id: crypto.randomUUID(),
+        title: m.title,
+        summary: m.summary,
+        sector: idea.sector,
+        stage: 0,
+        minutes: m.minutes,
+        dedicated: 0,
+        priority: 'Normal',
+        parentId: idea.id,
+        steps: [
+          {
+            id: crypto.randomUUID(),
+            text: `Planejar estrutura de ${m.title}`,
+            minutes: 15,
+            done: false,
+          },
+          {
+            id: crypto.randomUUID(),
+            text: `Construir implementação prática`,
+            minutes: Math.max(15, m.minutes - 30),
+            done: false,
+          },
+          {
+            id: crypto.randomUUID(),
+            text: `Revisar e integrar ao projeto macro`,
+            minutes: 15,
+            done: false,
+          },
+        ],
+        immediate: `Planejar estrutura de ${m.title}`,
+        clarity: 'Módulo inteligente desenhado para decompor a complexidade da ideia.',
+        pivots: [],
+        notes: [],
+      }));
+
+      setData(prev => ({
+        ...prev,
+        ideas: [...newSubIdeas, ...prev.ideas.map(i => (i.id === idea.id ? { ...i, isProject: true } : i))],
+      }));
+      toast.info('Módulos gerados pelo motor cognitivo local.');
+    } finally {
+      setIsGeneratingSubAi(false);
+    }
+  };
+
+  const handleUnlinkSubIdea = (subId: string) => {
+    setData(prev => ({
+      ...prev,
+      ideas: prev.ideas.map(i => (i.id === subId ? { ...i, parentId: undefined } : i)),
+    }));
+    toast.success('Módulo desvinculado. Agora é uma ideia individual.');
+  };
+
   return (
     <Drawer
       open={Boolean(ideaId)}
@@ -214,13 +403,91 @@ export function IdeaDetail({
     >
       <DrawerContent className="max-h-[94vh]">
         <div className="sheet-body max-w-4xl mx-auto w-full">
+          {/* Breadcrumb de Projeto Pai (se esta ideia for um módulo filho) */}
+          {parentIdea && (
+            <div className="mb-3 flex items-center justify-between p-2.5 rounded-lg bg-primary/10 border border-primary/25 text-xs text-primary">
+              <div className="flex items-center gap-2 truncate">
+                <FolderTree size={14} className="shrink-0" />
+                <span className="text-muted-foreground shrink-0">Módulo pertencente ao projeto:</span>
+                <strong className="truncate font-semibold">{parentIdea.title}</strong>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs text-primary hover:text-primary-foreground px-2 gap-1 shrink-0"
+                onClick={() => {
+                  setCurrentIdeaId(parentIdea.id);
+                  setTab('overview');
+                }}
+              >
+                <span>Ver Projeto</span>
+                <ArrowRight size={12} />
+              </Button>
+            </div>
+          )}
+
+          {/* Banner de Ideia Arquivada */}
+          {idea.archived && (
+            <div className="mb-3 p-3 rounded-lg bg-amber/10 border border-amber/30 flex items-center justify-between text-xs text-amber">
+              <span className="flex items-center gap-2">
+                <Archive size={14} />
+                Esta ideia está arquivada. Ela fica guardada no seu histórico sem poluir o funil ativo.
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs border-amber/40 text-amber hover:bg-amber/20 gap-1"
+                onClick={() => {
+                  updateIdea(idea.id, { archived: false, archivedAt: undefined });
+                  toast.success('Ideia restaurada para o funil ativo! ✨');
+                }}
+              >
+                <ArchiveRestore size={12} />
+                Restaurar Ideia
+              </Button>
+            </div>
+          )}
+
           {/* Cabeçalho */}
           <div className="flex items-center justify-between gap-3">
             <div className="sheet-eyebrow">
               <Sparkles size={15} />
-              DASHBOARD DE REALIZAÇÃO DA IDEIA
+              {idea.isProject || activeSubIdeas.length > 0 ? 'PROJETO MACRO & MÓDULOS' : 'DASHBOARD DE REALIZAÇÃO'}
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant={idea.isProject ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => {
+                  const newIsProj = !idea.isProject;
+                  updateIdea(idea.id, { isProject: newIsProj });
+                  toast.success(newIsProj ? 'Ideia configurada como Projeto Macro (com suporte a módulos) 📁' : 'Projeto Macro desativado.');
+                }}
+                title="Projetos Macro permitem decompor ideias complexas em múltiplos módulos (ex: Front-end, Back-end)"
+              >
+                <FolderTree size={13} className={idea.isProject ? 'text-primary' : ''} />
+                <span>{idea.isProject ? 'Projeto Macro' : 'Tornar Projeto'}</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-7 text-xs gap-1.5 ${idea.archived ? 'text-amber' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => {
+                  const newArchived = !idea.archived;
+                  updateIdea(idea.id, {
+                    archived: newArchived,
+                    archivedAt: newArchived ? localDate() : undefined,
+                  });
+                  toast.success(newArchived ? 'Ideia arquivada com sucesso.' : 'Ideia restaurada com sucesso.');
+                }}
+                title={idea.archived ? 'Restaurar para o funil ativo' : 'Arquivar esta ideia'}
+              >
+                {idea.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+                <span className="hidden sm:inline">{idea.archived ? 'Desarquivar' : 'Arquivar'}</span>
+              </Button>
+
               <span className={`sector-tag tone-${stageTones[idea.stage]}`}>
                 {stageNames[idea.stage]} ({completionPercent}%)
               </span>
@@ -251,6 +518,15 @@ export function IdeaDetail({
             >
               <ListTodo size={13} />
               Passos ({completedStepsCount}/{totalStepsCount})
+            </Button>
+            <Button
+              variant={tab === 'subideas' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0"
+              onClick={() => setTab('subideas')}
+            >
+              <FolderTree size={13} className={activeSubIdeas.length > 0 ? 'text-primary' : ''} />
+              Ideias do Projeto ({activeSubIdeas.length})
             </Button>
             <Button
               variant={tab === 'pivots' ? 'default' : 'ghost'}
@@ -385,6 +661,54 @@ export function IdeaDetail({
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                </div>
+              )}
+
+              {/* Card de Módulos para Projetos Macro */}
+              {(idea.isProject || activeSubIdeas.length > 0) && (
+                <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                      <FolderTree size={14} />
+                      Estrutura do Projeto Macro ({projectStats.totalSub} módulos)
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs text-primary px-2 gap-1"
+                      onClick={() => setTab('subideas')}
+                    >
+                      <span>Gerenciar Módulos</span>
+                      <ArrowRight size={12} />
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{projectStats.completedSub} de {projectStats.totalSub} módulos realizados</span>
+                    <strong className="text-foreground font-semibold">{projectStats.percent}%</strong>
+                  </div>
+                  <progress value={projectStats.percent} max={100} />
+
+                  {activeSubIdeas.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                      {activeSubIdeas.slice(0, 4).map(sub => (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => setCurrentIdeaId(sub.id)}
+                          className="p-2.5 rounded-lg border border-border/70 bg-card hover:border-primary/50 text-left transition-all cursor-pointer flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-medium text-foreground truncate block">{sub.title}</span>
+                            <span className="text-[10px] text-muted-foreground">
+                              {stageNames[sub.stage]} · {formatMinutes(sub.minutes)}
+                            </span>
+                          </div>
+                          <ArrowRight size={12} className="text-muted-foreground shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -630,7 +954,284 @@ export function IdeaDetail({
             </div>
           )}
 
-          {/* ABA 3: MUDANÇA DE ROTA & ESCOPO (PIVÔ) */}
+          {/* ABA SUB-IDEIAS & MÓDULOS DE PROJETOS COMPLEXOS */}
+          {tab === 'subideas' && (
+            <div className="space-y-6">
+              {/* Painel de Métricas do Projeto */}
+              <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-semibold text-sm flex items-center gap-2 text-foreground">
+                      <FolderTree size={16} className="text-primary" />
+                      Estrutura de Módulos do Projeto
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Projetos complexos podem conter várias ideias e frentes de desenvolvimento (ex: front-end, back-end, marketing).
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isGeneratingSubAi}
+                      className="h-8 text-xs gap-1.5"
+                      onClick={handleGenerateAiSubModules}
+                      title="Sugerir ideias e frentes com IA para este projeto"
+                    >
+                      {isGeneratingSubAi ? (
+                        <>
+                          <Clock3 size={13} className="text-primary animate-spin" />
+                          Planejando com IA...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={13} className="text-primary" />
+                          Sugerir Ideias com IA ✨
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs gap-1.5"
+                      onClick={() => setShowSubIdeaForm(!showSubIdeaForm)}
+                    >
+                      <Plus size={14} />
+                      {showSubIdeaForm ? 'Cancelar' : '+ Nova Ideia no Projeto'}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                  <div className="p-3 rounded-lg bg-card/80 border border-border/70">
+                    <span className="text-[11px] text-muted-foreground uppercase font-semibold">Total de Ideias</span>
+                    <strong className="block text-2xl font-display font-medium text-foreground mt-1">
+                      {projectStats.totalSub}
+                    </strong>
+                  </div>
+                  <div className="p-3 rounded-lg bg-card/80 border border-border/70">
+                    <span className="text-[11px] text-muted-foreground uppercase font-semibold">Realizadas</span>
+                    <strong className="block text-2xl font-display font-medium text-green mt-1">
+                      {projectStats.completedSub}
+                    </strong>
+                  </div>
+                  <div className="p-3 rounded-lg bg-card/80 border border-border/70">
+                    <span className="text-[11px] text-muted-foreground uppercase font-semibold">Progresso Geral</span>
+                    <strong className="block text-2xl font-display font-medium text-primary mt-1">
+                      {projectStats.percent}%
+                    </strong>
+                  </div>
+                  <div className="p-3 rounded-lg bg-card/80 border border-border/70">
+                    <span className="text-[11px] text-muted-foreground uppercase font-semibold">Tempo Total</span>
+                    <strong className="block text-2xl font-display font-medium text-foreground mt-1">
+                      {formatMinutes(projectStats.totalMinutes)}
+                    </strong>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+                    <span>Taxa de conclusão agregada</span>
+                    <span>{projectStats.percent}%</span>
+                  </div>
+                  <progress value={projectStats.percent} max={100} className="w-full h-2" />
+                </div>
+              </div>
+
+              {/* Formulário para Adicionar Nova Ideia ao Projeto */}
+              {showSubIdeaForm && (
+                <div className="p-4 rounded-xl border border-primary/40 bg-card space-y-3.5 shadow-sm">
+                  <span className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                    <Plus size={14} />
+                    Adicionar Nova Ideia a este Projeto
+                  </span>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Título da Ideia *</label>
+                    <input
+                      className="text-field text-xs"
+                      placeholder="Ex.: Front-end da loja, API de pagamentos, Campanha de marketing..."
+                      value={subIdeaTitle}
+                      onChange={e => setSubIdeaTitle(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Objetivo / O que essa ideia resolve</label>
+                    <textarea
+                      rows={2}
+                      className="text-field text-xs resize-none"
+                      placeholder="Ex.: Desenvolver os layouts, vitrine e carrinho de compras responsivo..."
+                      value={subIdeaSummary}
+                      onChange={e => setSubIdeaSummary(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="text-xs text-muted-foreground">
+                      Prioridade
+                      <select
+                        className="mt-1"
+                        value={subIdeaPriority}
+                        onChange={e => setSubIdeaPriority(e.target.value as Idea['priority'])}
+                      >
+                        <option value="Normal">Normal</option>
+                        <option value="Importante">Importante</option>
+                        <option value="Urgente">Urgente</option>
+                      </select>
+                    </label>
+
+                    <label className="text-xs text-muted-foreground">
+                      Tempo Estimado
+                      <select
+                        className="mt-1"
+                        value={subIdeaMinutes}
+                        onChange={e => setSubIdeaMinutes(Number(e.target.value))}
+                      >
+                        <option value={30}>30 min</option>
+                        <option value={60}>1h</option>
+                        <option value={90}>1h 30min</option>
+                        <option value={120}>2h</option>
+                        <option value={180}>3h</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowSubIdeaForm(false)}>
+                      Cancelar
+                    </Button>
+                    <Button size="sm" className="h-8 text-xs gap-1" onClick={handleCreateSubIdea}>
+                      <Check size={13} />
+                      Criar Ideia no Projeto
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Lista de Ideias Vinculadas */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs uppercase font-semibold text-muted-foreground tracking-wider">
+                    Ideias deste Projeto ({subIdeas.length})
+                  </h4>
+                  {subIdeas.length > 0 && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Clique em uma ideia para abrir e executar seus passos no funil
+                    </span>
+                  )}
+                </div>
+
+                {subIdeas.length === 0 ? (
+                  <div className="p-8 rounded-xl border border-dashed border-border/80 text-center space-y-3">
+                    <FolderTree size={32} className="mx-auto text-muted-foreground/60" />
+                    <div className="max-w-md mx-auto">
+                      <h4 className="font-semibold text-sm text-foreground">Nenhuma ideia adicionada ainda neste projeto</h4>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                        Quebre o escopo deste projeto em ideias menores e focadas (como Front-end, Back-end, Marketing, etc.) para acelerar a execução.
+                      </p>
+                    </div>
+                    <div className="flex justify-center gap-2 pt-2">
+                      <Button size="sm" className="h-8 text-xs gap-1.5" onClick={() => setShowSubIdeaForm(true)}>
+                        <Plus size={13} />
+                        Criar Primeira Ideia
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleGenerateAiSubModules}>
+                        <Sparkles size={13} className="text-primary" />
+                        Sugerir Ideias com IA
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {subIdeas.map(sub => {
+                      const subCompleted = sub.steps.filter(s => s.done).length;
+                      const subTotal = sub.steps.length;
+                      const subPercent = subTotal > 0 ? Math.round((subCompleted / subTotal) * 100) : 0;
+
+                      return (
+                        <div
+                          key={sub.id}
+                          className={`p-4 rounded-xl border transition-all ${
+                            sub.archived
+                              ? 'bg-secondary/30 border-border/50 opacity-70'
+                              : 'bg-card border-border hover:border-primary/40'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`sector-tag tone-${stageTones[sub.stage]}`}>
+                                {stageNames[sub.stage]} ({subPercent}%)
+                              </span>
+                              {sub.archived && (
+                                <span className="text-[10px] bg-amber/20 text-amber px-1.5 py-0.5 rounded font-medium">
+                                  Arquivado
+                                </span>
+                              )}
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Clock3 size={12} />
+                                {formatMinutes(sub.minutes)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1 text-primary hover:bg-primary/10"
+                                onClick={() => {
+                                  setCurrentIdeaId(sub.id);
+                                  setTab('overview');
+                                }}
+                                title="Abrir painel e checklist desta ideia"
+                              >
+                                <span>Abrir Ideia</span>
+                                <ArrowRight size={12} />
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => handleUnlinkSubIdea(sub.id)}
+                                title="Desvincular ideia do projeto (tornar ideia avulsa)"
+                              >
+                                Desvincular
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs text-muted-foreground hover:text-amber"
+                                onClick={() => {
+                                  updateIdea(sub.id, { archived: !sub.archived });
+                                  toast.success(sub.archived ? 'Ideia restaurada!' : 'Ideia arquivada!');
+                                }}
+                                title={sub.archived ? 'Restaurar ideia' : 'Arquivar ideia'}
+                              >
+                                {sub.archived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+                              </Button>
+                            </div>
+                          </div>
+
+                          <h4 className="font-semibold text-sm text-foreground">{sub.title}</h4>
+                          <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{sub.summary}</p>
+
+                          <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Checklist: {subCompleted} de {subTotal} passos</span>
+                            <span>{subPercent}%</span>
+                          </div>
+                          <progress value={subCompleted} max={Math.max(1, subTotal)} className="mt-1" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ABA 4: MUDANÇA DE ROTA & ESCOPO (PIVÔ) */}
           {tab === 'pivots' && (
             <div className="space-y-5">
               <div className="p-4 rounded-lg bg-card border border-border">

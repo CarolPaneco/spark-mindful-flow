@@ -203,5 +203,69 @@ Responda EXCLUSIVAMENTE um objeto JSON válido (sem tags markdown nem explicaç�
     return { success: false, error: lastError || 'Erro ao planejar ideia no Gemini.' };
   }
 
+  if (action === 'project') {
+    const { projectTitle, projectSummary, sector } = body;
+    const prompt = `Você é o Ideaflow AI, um arquiteto prático e experiente de projetos humanos e profissionais.
+O usuário está criando o seguinte projeto macro:
+Título: "${projectTitle}"
+Descrição/Resumo: "${projectSummary || 'Sem descrição detalhada'}"
+Setor de foco: "${sector || 'personal'}"
+
+Sua tarefa: Decomponha esse projeto macro em 3 a 5 ideias/frentes/módulos menores, complementares e altamente realistas para que o projeto saia do papel com ordem e clareza.
+ATENÇÃO IMPORTANTE:
+- NUNCA invente jargões de tecnologia ou programação (como API, front-end, back-end, deploy) a menos que o projeto seja EXPLICITAMENTE de tecnologia/software!
+- Se o projeto for uma reforma de cozinha/casa, as frentes devem ser: Planejamento & Orçamento, Alvenaria/Demolição/Hidráulica, Marcenaria & Bancadas, Pintura & Decoração/Iluminação.
+- Se o projeto for culinária/visita à família, as frentes devem ser sobre ingredientes, preparo, transporte e momento do encontro.
+- Se for marcenaria, as frentes devem ser projeto/medidas, aparelhamento da madeira, usinagem/encaixes, lixamento/acabamento.
+- Se for saúde/exercício, foque em rotina, equipamentos/ambiente, prática inicial e evolução.
+
+Responda EXCLUSIVAMENTE um array JSON de objetos (sem markdown ao redor, apenas o JSON puro):
+[
+  {
+    "title": "Título conciso da frente (ex: Planejamento & Orçamento)",
+    "summary": "Resumo prático em 1 frase do que será realizado nesta frente",
+    "minutes": 60
+  }
+]`;
+
+    let lastError = '';
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.6,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const contentStr = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (contentStr) {
+            const modules = JSON.parse(contentStr);
+            if (Array.isArray(modules) && modules.length > 0) {
+              return { success: true, modules, model };
+            }
+          }
+        }
+
+        const errData = await res.json().catch(() => ({}));
+        lastError = errData?.error?.message || `HTTP ${res.status}`;
+        if (res.status === 400 && lastError.toLowerCase().includes('api_key')) break;
+        if (res.status === 401 || res.status === 403) break;
+      } catch (err: any) {
+        lastError = err?.message || 'Falha de conexão com Gemini';
+      }
+    }
+
+    return { success: false, error: lastError || 'Erro ao sugerir frentes do projeto no Gemini.' };
+  }
+
   return { success: false, error: 'Ação desconhecida.' };
 }

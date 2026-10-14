@@ -588,3 +588,111 @@ export async function askMentorAi({
   const localReply = localAiResponse(message, contextIdea, allIdeas);
   return { reply: localReply, provider: 'local' };
 }
+
+/**
+ * Decompõe um Projeto Macro em ideias/frentes de desenvolvimento utilizando o Google Gemini AI.
+ * Se a API estiver indisponível ou sem chave, utiliza o motor heurístico local sem viés tecnológico.
+ */
+export async function generateProjectModulesWithGemini(
+  projectTitle: string,
+  projectSummary: string,
+  sector: string
+): Promise<{ modules: { title: string; summary: string; minutes: number }[]; usedGemini: boolean; error?: string }> {
+  const geminiKey = getActiveGeminiKey();
+
+  if (geminiKey) {
+    // 1. Tenta via backend seguro (/api/gemini)
+    try {
+      const res = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'project',
+          apiKey: geminiKey,
+          projectTitle,
+          projectSummary,
+          sector,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.modules) && data.modules.length > 0) {
+          return { modules: data.modules, usedGemini: true };
+        }
+      }
+    } catch (err: any) {
+      console.warn('Backend /api/gemini indisponível para frentes do projeto, tentando fallback:', err?.message);
+    }
+
+    // 2. Fallback direto caso o endpoint proxy não esteja acessível
+    const candidateModels = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+    const prompt = `Você é o Ideaflow AI, um arquiteto prático e experiente de projetos humanos e profissionais.
+O usuário está criando o seguinte projeto macro:
+Título: "${projectTitle}"
+Descrição/Resumo: "${projectSummary || 'Sem descrição detalhada'}"
+Setor de foco: "${sector || 'personal'}"
+
+Sua tarefa: Decomponha esse projeto macro em 3 a 5 ideias/frentes/módulos menores, complementares e altamente realistas para que o projeto saia do papel com ordem e clareza.
+ATENÇÃO IMPORTANTE:
+- NUNCA invente jargões de tecnologia ou programação (como API, front-end, back-end, deploy) a menos que o projeto seja EXPLICITAMENTE de tecnologia/software!
+- Se o projeto for uma reforma de cozinha/casa, as frentes devem ser: Planejamento & Orçamento, Alvenaria/Demolição/Hidráulica, Marcenaria & Bancadas, Pintura & Decoração/Iluminação.
+- Se o projeto for culinária/visita à família, as frentes devem ser sobre ingredientes, preparo, transporte e momento do encontro.
+- Se for marcenaria, as frentes devem ser projeto/medidas, aparelhamento da madeira, usinagem/encaixes, lixamento/acabamento.
+- Se for saúde/exercício, foque em rotina, equipamentos/ambiente, prática inicial e evolução.
+
+Responda EXCLUSIVAMENTE um array JSON de objetos (sem markdown ao redor, apenas o JSON puro):
+[
+  {
+    "title": "Título conciso da frente (ex: Planejamento & Orçamento)",
+    "summary": "Resumo prático em 1 frase do que será realizado nesta frente",
+    "minutes": 60
+  }
+]`;
+
+    let lastError = '';
+    for (const model of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.6,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
+
+        if (response.ok) {
+          const json = await response.json();
+          const contentStr = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (contentStr) {
+            const modules = JSON.parse(contentStr);
+            if (Array.isArray(modules) && modules.length > 0) {
+              return { modules, usedGemini: true };
+            }
+          }
+        }
+
+        const errData = await response.json().catch(() => ({}));
+        lastError = errData?.error?.message || `HTTP ${response.status}`;
+        if (response.status === 400 && lastError.toLowerCase().includes('api_key')) break;
+        if (response.status === 401 || response.status === 403) break;
+      } catch (err: any) {
+        lastError = err?.message || 'Falha de conexão com Gemini';
+      }
+    }
+
+    console.warn('Erro ao chamar Gemini para frentes de projeto, usando motor local inteligente:', lastError);
+    const fallback = generateSubModulesAi(projectTitle, projectSummary, sector);
+    return { modules: fallback, usedGemini: false, error: lastError };
+  }
+
+  // Fallback inteligente offline
+  const fallback = generateSubModulesAi(projectTitle, projectSummary, sector);
+  return { modules: fallback, usedGemini: false };
+}
+

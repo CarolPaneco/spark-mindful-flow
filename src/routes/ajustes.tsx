@@ -12,6 +12,11 @@ import {
   Key,
   ExternalLink,
   Bot,
+  Smartphone,
+  HardDrive,
+  Lock,
+  ServerOff,
+  HelpCircle,
 } from 'lucide-react';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { toast } from 'sonner';
@@ -287,22 +292,67 @@ function Settings() {
 
       {/* Backups & Portabilidade */}
       <section className="settings-section">
-        <h2>Suas ideias, protegidas</h2>
-        <p>
-          {data.ideas.length} ideias e {data.sectors.length} setores salvos neste dispositivo.
-        </p>
-        <div className="settings-buttons">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="flex items-center gap-2">
+              <HardDrive size={20} className="text-primary" />
+              Segurança & Backup Local (100% no seu dispositivo)
+            </h2>
+            <p>
+              {data.ideas.length} ideias e {data.sectors.length} setores salvos exclusivamente no armazenamento seguro deste aparelho.
+            </p>
+          </div>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-green/10 text-green border border-green/20 font-medium shrink-0 flex items-center gap-1">
+            <Lock size={12} />
+            Privacidade Total
+          </span>
+        </div>
+
+        {/* Card Explicativo: Por que é um App e como funciona o Backup Local */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="p-3.5 rounded-xl border border-border bg-card/70 space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-foreground">
+              <ServerOff size={16} className="text-pink" />
+              Zero Rastreamento em Nuvem
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Suas ideias não são enviadas para nenhum banco de dados centralizado nem vendidas. Elas residem no banco local isolado do seu dispositivo.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-border bg-card/70 space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-foreground">
+              <Smartphone size={16} className="text-cyan" />
+              App Offline Autônomo
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              O Ideaflow é um Progressive Web App (PWA) nativo: funciona no modo avião, na rua ou sem sinal, com inicialização instantânea.
+            </p>
+          </div>
+
+          <div className="p-3.5 rounded-xl border border-border bg-card/70 space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-foreground">
+              <ShieldCheck size={16} className="text-green" />
+              Você é Dono dos seus Dados
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Ao gerar um backup em JSON ou ZIP, você tem um arquivo físico em mãos para restaurar em qualquer celular ou computador quando quiser.
+            </p>
+          </div>
+        </div>
+
+        <div className="settings-buttons mt-4">
           <Button variant="outline" onClick={() => download('json')}>
             <FileJson />
             Exportar JSON
           </Button>
           <Button variant="outline" onClick={() => download('zip')}>
             <Download />
-            Exportar ZIP
+            Exportar ZIP Seguro
           </Button>
           <Button variant="outline" onClick={() => input.current?.click()}>
             <Upload />
-            Restaurar backup
+            Restaurar de arquivo
           </Button>
           <input
             ref={input}
@@ -317,10 +367,9 @@ function Settings() {
       <div className="settings-note flex items-start gap-3">
         <ShieldCheck className="text-green shrink-0 mt-1" size={18} />
         <div>
-          Seus dados e notas ficam apenas no seu navegador. Exporte um backup antes de limpar os
-          dados ou trocar de dispositivo.
+          <strong>Recomendação de segurança:</strong> Se você for formatar o aparelho ou limpar os cookies e dados de navegação, exporte um backup em 1 clique antes.
           <br />
-          O Ideaflow é 100% seu, autônomo e sem dependências externas obrigatórias.
+          O Ideaflow é 100% autônomo, seguro e não depende de nenhuma empresa ou servidor externo para funcionar.
         </div>
       </div>
     </>

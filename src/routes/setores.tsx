@@ -79,10 +79,11 @@ function Sectors() {
     setMounted(true);
   }, []);
 
-  const comparison = calculateGlobalSectorComparison(data.sectors, data.ideas);
+  const activeIdeas = data.ideas.filter(i => !i.archived);
+  const comparison = calculateGlobalSectorComparison(data.sectors, activeIdeas);
   const selectedSector = data.sectors.find(s => s.id === selected);
   const selectedAnalytics = selectedSector
-    ? calculateSectorAnalytics(selectedSector, data.ideas)
+    ? calculateSectorAnalytics(selectedSector, activeIdeas)
     : null;
 
   return (
@@ -473,7 +474,7 @@ function Sectors() {
                   </div>
 
                   <div className="stage-cards">
-                    {data.ideas
+                    {activeIdeas
                       .filter(i => i.sector === selected)
                       .map(i => (
                         <IdeaCard

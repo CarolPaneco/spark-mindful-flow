@@ -109,4 +109,8 @@ export default defineConfig(({ command }) => ({
       "@tanstack/query-core",
     ],
   },
+  server: {
+    host: true, // Libera o acesso pelo IP da sua rede Wi-Fi / Celular
+    port: 5173,
+  },
 }));
