@@ -20,6 +20,8 @@ import { AiChatSheet } from '@/components/ai-chat-sheet';
 import { ProfileSidebar } from '@/components/profile-sidebar';
 import { IdeaDetail } from '@/components/idea-detail';
 import { AuthModal } from '@/components/auth-modal';
+import { SplashScreen } from '@/components/splash-screen';
+import { OnboardingTutorial } from '@/components/onboarding-tutorial';
 import avatar from '@/assets/ideaflow-avatar.png';
 import { Idea } from '@/lib/ideaflow';
 import { User, LogIn, Cloud, CloudCheck, RefreshCw } from 'lucide-react';
@@ -41,7 +43,28 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mentorIdea, setMentorIdea] = useState<Idea | null>(null);
   const [greeting, setGreeting] = useState('Que bom ter você aqui');
   const [online, setOnline] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
+  const [showTutorial, setShowTutorial] = useState(false);
   const path = useRouterState({ select: state => state.location.pathname });
+
+  const checkTutorial = () => {
+    if (typeof window === 'undefined') return;
+    const completed = localStorage.getItem('ideaflow_tutorial_completed');
+    if (!completed) {
+      setShowTutorial(true);
+    }
+  };
+
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+    // Passo 2 do plano cronológico: Se não estiver logado, abre login/cadastro
+    if (!user) {
+      setAuthOpen(true);
+    } else {
+      // Passo 3 do plano cronológico: Se logado, checa tutorial
+      checkTutorial();
+    }
+  };
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -67,6 +90,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     const loginEvent = () => setAuthOpen(true);
     window.addEventListener('ideaflow:login', loginEvent);
 
+    const tutorialEvent = () => setShowTutorial(true);
+    window.addEventListener('ideaflow:tutorial', tutorialEvent);
+
     return () => {
       window.removeEventListener('online', sync);
       window.removeEventListener('offline', sync);
@@ -74,6 +100,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       window.removeEventListener('ideaflow:mentor', mentorEvent);
       window.removeEventListener('ideaflow:profile', profileEvent);
       window.removeEventListener('ideaflow:login', loginEvent);
+      window.removeEventListener('ideaflow:tutorial', tutorialEvent);
     };
   }, []);
 
@@ -83,103 +110,110 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="app-root">
       <header className="topbar">
         <div className="topbar-inner">
-          <Link to="/" className="wordmark" aria-label="Ideaflow início">
+          <Link to="/" className="wordmark active:scale-95 transition-transform" aria-label="Ideaflow início">
             <span className="brand-icon">
               <AudioLines />
             </span>
             idea<span>flow</span>
             <span className="brand-dot">.</span>
           </Link>
-          <div className="header-right">
+          <div className="header-right flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Botão de Destaque: Mentor IA */}
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs gap-1.5 border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 shadow-xs"
+              className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 border-primary/40 bg-gradient-to-r from-primary/15 via-primary/10 to-violet/15 text-primary hover:bg-primary/25 active:scale-95 transition-all shadow-xs px-2.5 sm:px-3.5 rounded-full font-semibold shrink-0 cursor-pointer"
               onClick={() => {
                 setMentorIdea(null);
                 setAiChatOpen(true);
               }}
             >
               <Sparkles size={13} className="text-primary animate-pulse" />
-              <span className="hidden sm:inline font-medium">Mentor IA</span>
-              <span className="text-[10px] bg-primary/20 text-primary px-1 rounded uppercase font-bold">Grátis</span>
+              <span>Mentor IA</span>
             </Button>
 
-            <span className="header-streak">
-              <Flame size={16} />
-              <strong>
+            {/* Streak de horas dedicadas (desktop) */}
+            <span className="header-streak hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Flame size={15} className="text-amber" />
+              <strong className="text-foreground font-medium">
                 {(dedicated / 60).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}h
               </strong>
-              <span>de realização</span>
             </span>
 
+            {/* Alternador de Tema */}
             <Button
               variant="ghost"
               size="icon"
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
               aria-label={data.theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
               title="Trocar tema"
               onClick={() => setData(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
             >
-              {data.theme === 'dark' ? <Sun /> : <Moon />}
+              {data.theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </Button>
 
-            {/* Botão de Login ou Status da Conta */}
-            {user ? (
-              <div className="flex items-center gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground hidden sm:flex"
-                  onClick={() => syncWithCloud()}
-                  disabled={isSyncing}
-                  title="Sincronizar com o banco de dados seguro Supabase"
-                >
-                  <RefreshCw size={12} className={isSyncing ? 'animate-spin text-primary' : 'text-green'} />
-                  <span className="text-[11px] font-mono">{user.email?.split('@')[0]}</span>
-                </Button>
-              </div>
-            ) : (
+            {/* Botão de Entrar (se não logado) */}
+            {!user ? (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs gap-1.5 border-primary/40 bg-card hover:bg-primary/10 text-foreground"
+                className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 border-primary/40 bg-card hover:bg-primary/10 text-foreground active:scale-95 transition-all px-2.5 sm:px-3.5 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
                 onClick={() => setAuthOpen(true)}
                 title="Entrar ou criar conta gratuita para sincronizar ideias"
               >
                 <LogIn size={13} className="text-primary" />
-                <span className="hidden sm:inline font-medium">Entrar / Cadastrar</span>
-                <span className="sm:hidden font-medium">Entrar</span>
+                <span>Entrar</span>
+              </Button>
+            ) : (
+              /* Indicador de Sincronização na Nuvem (se logado) */
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 sm:h-9 px-2 rounded-full text-xs gap-1.5 text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
+                onClick={() => syncWithCloud()}
+                disabled={isSyncing}
+                title="Sincronizar ideias com Supabase"
+              >
+                <RefreshCw size={12} className={isSyncing ? 'animate-spin text-primary' : 'text-green'} />
+                <span className="text-[11px] font-mono hidden md:inline">{user.email?.split('@')[0]}</span>
               </Button>
             )}
 
-            {/* Barra lateral discreta de perfil */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground hidden sm:flex"
-              onClick={() => setProfileOpen(true)}
-              title="Abrir barra lateral do perfil e ideias arquivadas"
-            >
-              <User size={13} className="text-primary" />
-              <span>Perfil</span>
-              {data.ideas.some(i => i.archived) && (
-                <span className="text-[10px] bg-secondary/80 text-muted-foreground px-1.5 py-0.2 rounded-full font-mono">
-                  {data.ideas.filter(i => i.archived).length}
-                </span>
-              )}
-            </Button>
-
-            <span className="header-divider" />
-            <button
-              type="button"
-              onClick={() => (user ? setProfileOpen(true) : setAuthOpen(true))}
-              className="avatar-trigger relative rounded-full cursor-pointer transition-transform hover:scale-105 focus:outline-none"
-              title={user ? 'Abrir Meu Perfil' : 'Fazer Login / Cadastrar'}
-              aria-label="Perfil do Usuário"
-            >
-              <img src={avatar} alt="Avatar holográfico" className="avatar hover:ring-2 hover:ring-primary/60 transition-all" width={44} height={44} />
-            </button>
+            {/* Avatar / Trigger do Perfil: se logado, mostra avatar com online dot; em desktop quando deslogado também exibe */}
+            {user ? (
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none ml-0.5 shrink-0"
+                title="Abrir Meu Perfil"
+                aria-label="Perfil do Usuário"
+              >
+                <img
+                  src={avatar}
+                  alt="Avatar holográfico"
+                  className="avatar hover:ring-2 hover:ring-primary/60 transition-all"
+                  width={34}
+                  height={34}
+                />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green border-2 border-background" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAuthOpen(true)}
+                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none ml-0.5 shrink-0 hidden sm:block"
+                title="Fazer Login / Cadastrar"
+                aria-label="Perfil do Usuário"
+              >
+                <img
+                  src={avatar}
+                  alt="Avatar holográfico"
+                  className="avatar hover:ring-2 hover:ring-primary/60 transition-all opacity-85"
+                  width={34}
+                  height={34}
+                />
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -247,7 +281,22 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <AuthModal
         open={authOpen}
-        onClose={() => setAuthOpen(false)}
+        onClose={() => {
+          setAuthOpen(false);
+          checkTutorial();
+        }}
+        onSuccess={() => {
+          setAuthOpen(false);
+          checkTutorial();
+        }}
+      />
+      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
+      <OnboardingTutorial
+        open={showTutorial}
+        onClose={() => {
+          setShowTutorial(false);
+          localStorage.setItem('ideaflow_tutorial_completed', 'true');
+        }}
       />
       {profileIdeaId && (
         <IdeaDetail

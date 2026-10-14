@@ -22,9 +22,10 @@ describe('Ideaflow offline engine', () => {
   });
 
   it('accepts complete backups and rejects malformed data', () => {
-    expect(isFlowData(seedData())).toBe(true);
+    expect(isFlowData(seedData(false))).toBe(true);
+    expect(isFlowData(seedData(true))).toBe(true);
     expect(isFlowData({ ideas: [], sectors: [] })).toBe(false);
-    const data = seedData();
+    const data = seedData(true);
     const first = data.ideas[0];
     if (first) first.stage = 8 as never;
     expect(isFlowData(data)).toBe(false);
@@ -36,7 +37,7 @@ describe('Ideaflow offline engine', () => {
   });
 
   it('supports complex macro projects with nested sub-ideas', () => {
-    const data = seedData();
+    const data = seedData(true);
     const project = data.ideas.find(i => i.id === 'demo-7');
     expect(project).toBeDefined();
     expect(project?.isProject).toBe(true);
@@ -80,7 +81,7 @@ describe('Ideaflow offline engine', () => {
   });
 
   it('correctly tracks and filters archived ideas', () => {
-    const data = seedData();
+    const data = seedData(true);
     const archived = data.ideas.filter(i => i.archived);
     expect(archived.length).toBeGreaterThanOrEqual(1);
 

@@ -17,7 +17,8 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from '@/compone
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
 import { planIdea, formatMinutes, generateAiSteps, type Idea, type Step } from '@/lib/ideaflow';
-import { planIdeaWithGemini, getActiveGeminiKey } from '@/lib/ai-assistant';
+import { planIdeaWithAi, getActiveGeminiKey } from '@/lib/ai-assistant';
+import { isGroqActive } from '@/lib/groq';
 import { toast } from 'sonner';
 
 interface SpeechResult {
@@ -159,12 +160,12 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
     if (!text.trim() || recording || generating) return;
     setGenerating(true);
     try {
-      const { idea, usedGemini, error } = await planIdeaWithGemini(text, data.sectors);
+      const { idea, provider } = await planIdeaWithAi(text, data.sectors);
       setDraft(idea);
-      if (usedGemini) {
+      if (provider === 'groq') {
+        toast.success('Plano desenhado com IA Groq (LLaMA 3.3) ⚡');
+      } else if (provider === 'gemini') {
         toast.success('Plano desenhado pelo Google Gemini! ✨');
-      } else if (error) {
-        toast.error(`Aviso Gemini: ${error}. Plano criado com o motor local de contingência.`);
       } else {
         toast.success('Plano desenhado com inteligência offline! ✨');
       }

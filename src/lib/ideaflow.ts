@@ -136,17 +136,8 @@ const makeIdea = (
   };
 };
 
-export const seedData = (): FlowData => ({
-  theme: 'dark',
-  palette: 'Aurora',
-  profile: {
-    name: 'Explorador Ideaflow',
-    role: 'Criador & Desenvolvedor',
-    bio: 'Transformando ideias em realidade, um passo consciente de cada vez.',
-    streak: 6,
-  },
-  sectors: initialSectors.map(s => ({ ...s })),
-  ideas: [
+export const seedData = (withDemos = false): FlowData => {
+  const demoIdeas = [
     makeIdea(
       'demo-1',
       'Um app para conectar pessoas e livros',
@@ -304,8 +295,21 @@ export const seedData = (): FlowData => ({
       false,
       true // archived
     ),
-  ],
-});
+  ];
+
+  return {
+    theme: 'dark',
+    palette: 'Aurora',
+    profile: {
+      name: 'Explorador Ideaflow',
+      role: 'Criador & Desenvolvedor',
+      bio: 'Transformando ideias em realidade, um passo consciente de cada vez.',
+      streak: 6,
+    },
+    sectors: initialSectors.map(s => ({ ...s })),
+    ideas: withDemos ? demoIdeas : [],
+  };
+};
 
 export function localDate(offsetDays = 0): string {
   const d = new Date();

@@ -33,20 +33,23 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // 1. Inicializa dados locais
+  // 1. Inicializa dados locais (sempre limpo de ideias mockadas demo-*)
   useEffect(() => {
     try {
       const stored = localStorage.getItem('ideaflow-v1');
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
         if (isFlowData(parsed)) {
-          setData(parsed);
-        } else {
-          toast.error('O backup local está inválido. Os exemplos foram carregados.');
+          // Remove completamente qualquer resquício de ideias mockadas (demo-*)
+          const cleanIdeas = (parsed.ideas || []).filter(i => !i.id.startsWith('demo-'));
+          setData({
+            ...parsed,
+            ideas: cleanIdeas,
+          });
         }
       }
     } catch {
-      toast.error('Não foi possível ler os dados salvos neste dispositivo.');
+      // Ignora erro de leitura
     }
     setReady(true);
     void import('@/lib/pwa').then(m => m.registerOffline());
@@ -118,11 +121,11 @@ export function FlowProvider({ children }: { children: ReactNode }) {
           ideas: cloudIdeas,
         }));
       } else {
-        // Se a nuvem estiver vazia, sobe as ideias locais existentes para a conta dele
-        const localIdeas = data.ideas;
-        if (localIdeas.length > 0) {
-          await syncIdeasToSupabase(localIdeas, currentUser.id);
-        }
+        // Se a nuvem estiver vazia, o usuário é novo e suas ideias começam 100% zeradas
+        setData(prev => ({
+          ...prev,
+          ideas: [],
+        }));
       }
     } catch (err) {
       console.warn('Erro ao sincronizar na inicialização do usuário:', err);
@@ -172,7 +175,24 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    toast.info('Você saiu da sua conta. Seus dados continuam no armazenamento local.');
+    // Zera as ideias e limpa cache para o próximo usuário
+    setData(prev => ({
+      ...prev,
+      ideas: [],
+      profile: {
+        name: 'Criador(a)',
+        role: 'Criador(a)',
+        streak: 1,
+      },
+    }));
+    try {
+      localStorage.removeItem('ideaflow-v1');
+    } catch {
+      // Ignora erro de storage
+    }
+    toast.info('Você saiu da sua conta.');
+    // Dispara evento para reabrir imediatamente o modal de login/cadastro
+    window.dispatchEvent(new Event('ideaflow:login'));
   };
 
   return (

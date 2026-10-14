@@ -24,7 +24,7 @@ import {
   formatMinutes,
   type Idea,
 } from '@/lib/ideaflow';
-import { generateProjectModulesWithGemini, getActiveGeminiKey } from '@/lib/ai-assistant';
+import { generateProjectModulesWithAi, getActiveGeminiKey } from '@/lib/ai-assistant';
 import { toast } from 'sonner';
 
 interface DraftSubIdea {
@@ -141,7 +141,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
 
     setIsGeneratingAi(true);
     try {
-      const result = await generateProjectModulesWithGemini(title, summary, sector);
+      const result = await generateProjectModulesWithAi(title, summary, sector);
       const formatted: DraftSubIdea[] = result.modules.map(m => ({
         id: crypto.randomUUID(),
         title: m.title,
@@ -152,7 +152,9 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
 
       setSubIdeas(formatted);
 
-      if (result.usedGemini) {
+      if (result.provider === 'groq') {
+        toast.success(`Groq LLaMA 3.3 gerou ${formatted.length} frentes personalizadas para “${title}”! ⚡`);
+      } else if (result.provider === 'gemini') {
         toast.success(`Google Gemini gerou ${formatted.length} frentes personalizadas para “${title}”! ✨`);
       } else {
         toast.success(`Motor Local Inteligente gerou ${formatted.length} frentes para seu projeto! ✨`);

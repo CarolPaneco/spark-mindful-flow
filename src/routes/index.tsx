@@ -96,21 +96,21 @@ function Index() {
           <Button
             aria-label="Novo projeto"
             variant="outline"
-            className="border-violet/40 bg-violet/10 text-violet hover:bg-violet/20 hover:text-violet gap-1.5 h-9 sm:h-[43px] px-2.5 sm:px-3.5 text-xs font-semibold rounded-md shadow-xs transition-all cursor-pointer"
+            className="border-violet/40 bg-violet/10 text-violet hover:bg-violet/20 hover:text-violet gap-1.5 h-9 sm:h-[43px] px-3 sm:px-3.5 text-xs sm:text-sm font-semibold rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer"
             onClick={() => setCreateProjectOpen(true)}
             title="Criar um novo projeto estruturado com ideias dentro"
           >
-            <FolderPlus size={15} className="text-violet" />
+            <FolderPlus size={16} className="text-violet" />
             <span>Projeto</span>
           </Button>
 
           <Button
             aria-label="Nova ideia"
-            className="new-idea gap-1.5 cursor-pointer h-9 sm:h-[43px] px-3 sm:px-4 text-xs font-semibold"
+            className="new-idea gap-1.5 cursor-pointer h-9 sm:h-[43px] px-3.5 sm:px-4 text-xs sm:text-sm font-semibold rounded-xl active:scale-95 transition-all shadow-xs"
             onClick={capture}
             title="Capturar uma nova ideia rápida"
           >
-            <Plus size={15} />
+            <Plus size={16} />
             <span>Ideia</span>
           </Button>
         </div>

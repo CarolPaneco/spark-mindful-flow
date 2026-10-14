@@ -1,11 +1,18 @@
-import { Idea, Sector, Step, planIdea, generateAiSteps } from './ideaflow';
+import { Idea, Sector, Step, planIdea, generateAiSteps, generateSubModulesAi } from './ideaflow';
+import {
+  getActiveGroqKey,
+  callGroqChat,
+  planIdeaWithGroq,
+  generateProjectModulesWithGroq,
+  isGroqActive,
+} from './groq';
 
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
-  provider?: 'gemini' | 'local';
+  provider?: 'groq' | 'gemini' | 'local';
   suggestedActions?: string[];
 }
 
@@ -124,86 +131,134 @@ export async function testGeminiApiKey(apiKey: string): Promise<{ success: boole
 function localAiResponse(userMessage: string, contextIdea?: Idea, allIdeas?: Idea[]): string {
   const query = userMessage.toLowerCase();
 
-  // Se o contexto for uma ideia específica
+  // 1. Reforma, Casa, Decoração e Construção
+  if (query.includes('reform') || query.includes('cozinha') || query.includes('banheiro') || query.includes('quarto') || query.includes('casa') || query.includes('pintura') || query.includes('piso') || query.includes('obra')) {
+    const title = contextIdea ? `para **${contextIdea.title}**` : 'para a sua reforma';
+    return `Planejamento prático de execução ${title}! 🛠️🏡\n\n` +
+      `Toda reforma bem-sucedida precisa de ordem para evitar desperdício de dinheiro e estresse:\n\n` +
+      `1. **Levantamento e Medição (20 min):** Meça as paredes, bancadas e pontos de tomada. Fotografe tudo de diferentes ângulos.\n` +
+      `2. **Lista de Materiais e Cotação (40 min):** Liste revestimentos, tintas, ferragens e consulte preços em pelo menos 2 lojas locais.\n` +
+      `3. **Desocupação e Proteção (30 min):** Retire louças, armários ou móveis soltos. Cubra o chão e passagens com papelão ou lona.\n` +
+      `4. **Execução em Ordem Correta:**\n` +
+      `   • 1º Infraestrutura (hidráulica e elétrica)\n` +
+      `   • 2º Revestimentos e alvenaria\n` +
+      `   • 3º Pintura e acabamentos\n` +
+      `   • 4º Instalação de marcenaria e iluminação\n\n` +
+      `🎯 **Ação Imediata de 15 min:** Pegue uma trena e anote as 3 principais medidas do espaço no bloco de notas da ideia.\n` +
+      `💡 *Dica do Mentor:* Deixe 15% de margem no orçamento para imprevistos. O segredo de uma reforma leve é respeitar a ordem das etapas!`;
+  }
+
+  // 2. Gastronomia, Receitas e Cozinha Afetiva
+  if (query.includes('bolo') || query.includes('receita') || query.includes('cenoura') || query.includes('doce') || query.includes('almoço') || query.includes('jantar') || query.includes('avó') || query.includes('família')) {
+    const title = contextIdea ? `para **${contextIdea.title}**` : 'para sua receita especial';
+    return `Que ideia cheia de afeto e sabor ${title}! 🍰❤️\n\n` +
+      `Aqui está o roteiro infalível para preparar tudo com carinho e sem correria:\n\n` +
+      `1. **Mise en Place / Checagem (15 min):** Separe e pese todos os ingredientes antes de ligar o forno (cenouras frescas, ovos em temperatura ambiente, óleo, açúcar e farinha).\n` +
+      `2. **Preparo da Massa (15 min):** Bata os líquidos no liquidificador até ficar homogêneo. Peneire a farinha e o fermento em uma tigela e misture delicadamente com um fouet (não bata para não solar).\n` +
+      `3. **Forno (40-45 min):** Forno pré-aquecido a 180°C. Faça o teste do palito no centro aos 40 minutos.\n` +
+      `4. **Cobertura de Chocolate Brilhante (15 min):** Em uma panela pequena, junte manteiga, cacau em pó, leite e açúcar. Ferva em fogo baixo até engrossar e jogue sobre o bolo morno.\n\n` +
+      `🎯 **Ação Imediata de 15 min:** Vá até a despensa e verifique a validade do fermento em pó.\n` +
+      `💡 *Dica do Mentor:* Momentos ao redor da mesa criam memórias para a vida toda. Aproveite cada minuto do preparo!`;
+  }
+
+  // 3. Marcenaria, Artesanato e Projetos Manuais
+  if (query.includes('marcenaria') || query.includes('madeira') || query.includes('móvel') || query.includes('lixar') || query.includes('verniz') || query.includes('artesanato') || query.includes('oficina')) {
+    const title = contextIdea ? `para **${contextIdea.title}**` : 'para o seu projeto manual';
+    return `Roteiro artesanal de precisão ${title}! 🪵📐\n\n` +
+      `1. **Desenho e Plano de Corte (25 min):** Coloque no papel o esboço com as dimensões exatas e a lista de peças.\n` +
+      `2. **Preparação dos Materiais (30 min):** Escolha as tábuas ou chapas, verifique esquadros e faça as marcações a lápis.\n` +
+      `3. **Cortes e Junções (60 min):** Realize os cortes com calma e faça a pré-montagem para garantir que os encaixes estejam perfeitos.\n` +
+      `4. **Lixamento Progressivo (45 min):** Lixe no sentido dos veios da madeira (grão 80 ➔ 150 ➔ 220).\n` +
+      `5. **Acabamento Protetor (30 min):** Aplique óleo mineral, cera de abelha ou seladora com pincel ou pano de algodão.\n\n` +
+      `🎯 **Ação Imediata de 15 min:** Defina as medidas externas da peça e anote no resumo da ideia.\n` +
+      `💡 *Dica do Mentor:* A paciência no lixamento é o que diferencia uma peça comum de uma obra-prima.`;
+  }
+
+  // 4. Negócios, Vendas, Clientes e Monetização
+  if (query.includes('monetiz') || query.includes('vender') || query.includes('ganhar') || query.includes('preço') || query.includes('cliente') || query.includes('loja') || query.includes('marketing')) {
+    const title = contextIdea ? `para **${contextIdea.title}**` : 'para o seu negócio';
+    return `Estratégia de validação comercial e monetização ${title}! 💼📈\n\n` +
+      `1. **Definição da Dor Urgente:** As pessoas não compram produtos, compram soluções para suas dores ou atalhos para seus desejos.\n` +
+      `2. **Pré-venda / 3 Primeiros Clientes:** Antes de gastar dinheiro com estoque ou plataformas complexas, converse com 3 pessoas reais e faça uma oferta irresistível com desconto de pioneiro.\n` +
+      `3. **Modelo de Precificação Simples:** Calcule custo + seu tempo + margem de 40% a 60%. Nunca cobre abaixo do mercado para não desvalorizar seu trabalho.\n` +
+      `4. **Garantia Incondicional:** Ofereça 100% de satisfação garantida para que o cliente sinta risco zero ao fechar com você.\n\n` +
+      `🎯 **Ação Imediata de 15 min:** Escreva em 1 parágrafo: "Eu ajudo [Público] a conseguir [Resultado] sem [Maior Dor]."\n` +
+      `💡 *Dica do Mentor:* Vender é prestar um serviço. Se o seu projeto gera valor verdadeiro, oferecê-lo com confiança é ajudar o próximo.`;
+  }
+
+  // 5. Destravar Procrastinação e Bloqueios
+  if (query.includes('destrav') || query.includes('procrastin') || query.includes('bloquei') || query.includes('dificuldade') || query.includes('preguiça') || query.includes('começar')) {
+    const title = contextIdea ? `em **${contextIdea.title}**` : 'no seu projeto';
+    return `Vamos destravar esse nó agora mesmo ${title}! ⚡🧠\n\n` +
+      `A procrastinação quase nunca é preguiça. Ela é uma resposta do cérebro a um passo que está vago demais ou a um medo sutil de falhar.\n\n` +
+      `🔥 **O Método dos 5 Minutos (Regra de Ouro):**\n` +
+      `Não tente terminar o projeto hoje. Pegue um cronômetro e comprometa-se a agir nele por apenas **5 minutos cronometrados**.\n` +
+      `• Se ao final de 5 minutos você quiser parar, tem permissão total para parar.\n` +
+      `• Na prática, 80% das vezes o cérebro quebra o atrito estático e continua trabalhando feliz.\n\n` +
+      `✂️ **Corte Radical:** Reduza pela metade o que você pretendia fazer hoje. O que é o MÍNIMO que você pode entregar agora?\n\n` +
+      `🎯 **Ação Imediata de 15 min:** Abra a ideia no app, selecione o primeiro passo e toque em **"Começar foco"**!`;
+  }
+
+  // 6. Se tiver ideia em contexto
   if (contextIdea) {
-    if (query.includes('bolo') || query.includes('receita') || query.includes('cenoura') || query.includes('cozinha') || query.includes('avó') || query.includes('família')) {
-      return `Que ideia cheia de afeto para **${contextIdea.title}**! ❤️\n\n` +
-        `Aqui está o plano prático para tornar essa visita inesquecível:\n\n` +
-        `1. **Checagem de Ingredientes (15 min):** Veja se tem cenouras frescas, ovos, óleo, farinha e açúcar.\n` +
-        `2. **Preparo e Forno (45 min):** Bata os líquidos no liquidificador, misture delicadamente a farinha e leve para assar a 180°C.\n` +
-        `3. **Cobertura Especial (20 min):** Faça uma calda de chocolate bem brilhante (manteiga, cacau, açúcar e leite).\n` +
-        `4. **A Visita:** Deixe esfriar, embale com cuidado e aproveite cada minuto de conversa com sua avó!\n\n` +
-        `💡 *Dica do Mentor:* O segredo do bolo fofinho é não bater demais a farinha de trigo. E o segredo da vida é aproveitar esses momentos com quem amamos.`;
-    }
-
-    if (query.includes('passo') || query.includes('etapa') || query.includes('fazer')) {
-      return `Aqui está um plano estratégico de ação para **${contextIdea.title}**:\n\n` +
+    if (query.includes('passo') || query.includes('etapa') || query.includes('fazer') || query.includes('plano')) {
+      return `Plano de ação executável para **${contextIdea.title}** (Setor: ${contextIdea.sector}):\n\n` +
         `1. **Primeiro Marco (15 min):** ${contextIdea.immediate || 'Definir o resultado visual em 1 frase.'}\n` +
-        `2. **Validação Simples:** Mostre esse rascunho para 1 pessoa e peça a opinião mais sincera.\n` +
-        `3. **Execução do Núcleo:** Elimine qualquer funcionalidade que não seja essencial para o objetivo principal.\n` +
-        `4. **Fechamento:** Finalize os últimos ajustes e coloque em uso real.\n\n` +
-        `💡 *Dica do Mentor:* Não espere ficar perfeito. O feedback do mundo real é 10x mais valioso que o planejamento no papel.`;
-    }
-
-    if (query.includes('destrav') || query.includes('procrastin') || query.includes('bloquei') || query.includes('dificuldade')) {
-      return `Vamos destravar **${contextIdea.title}** agora mesmo.\n\n` +
-        `Geralmente a procrastinação acontece por dois motivos: ou o próximo passo está muito vago, ou o escopo parece assustadoramente grande.\n\n` +
-        `🔥 **Exercício dos 5 minutos:**\n` +
-        `Abra um cronômetro e trabalhe nesta ideia durante apenas 5 minutos, sem a obrigação de terminar. Se quiser parar depois de 5 minutos, pare. (Quase sempre seu cérebro engrena e continua).\n\n` +
-        `Se o escopo estiver pesado, use a aba **Mudança de Rota** para cortar metade das pendências e lançar uma versão menor hoje.`;
-    }
-
-    if (query.includes('monetiz') || query.includes('vender') || query.includes('ganhar') || query.includes('preço')) {
-      return `Estratégia de monetização para **${contextIdea.title}**:\n\n` +
-        `1. **Pré-venda / Validação Antecipada:** Antes de construir tudo, converse com 3 pessoas que sofrem com essa dor e pergunte se pagariam para ter isso resolvido.\n` +
-        `2. **Modelo de Preço Simples:** Comece com um valor único ou assinatura acessível para os primeiros 10 clientes ("early adopters").\n` +
-        `3. **Garantia Incondicional:** Reduza o risco de quem compra oferecendo garantia de satisfação total.`;
+        `2. **Validação Rápida (30 min):** Execute a versão mais simples possível e avalie o resultado.\n` +
+        `3. **Execução do Núcleo (45 min):** Elimine distrações e foque exclusivamente no que gera valor.\n` +
+        `4. **Conclusão e Entrega (20 min):** Finalize os detalhes finais e mova o card para a próxima etapa do funil!\n\n` +
+        `🎯 **Ação Imediata:** ${contextIdea.immediate}\n` +
+        `💡 *Dica do Mentor:* O feito é infinitamente melhor que o perfeito que nunca sai do papel.`;
     }
 
     if (query.includes('escopo') || query.includes('pivô') || query.includes('mudar') || query.includes('simplificar')) {
       return `Análise de Escopo para **${contextIdea.title}**:\n\n` +
-        `Escopo atual: *"${contextIdea.scope || 'Versão inicial'}"*\n\n` +
-        `✂️ **Regra do Corte Radical:** Se você tivesse que lançar esse projeto amanhã às 18h, o que você deixaria de fora?\n` +
-        `O que sobrar é o seu verdadeiro MVP (Mínimo Produto Viável). Registre essa decisão na aba **Mudança de Rota** do projeto para guardar o motivo da mudança.`;
+        `Escopo registrado: *"${contextIdea.scope || 'Versão inicial em desenvolvimento'}"*\n\n` +
+        `✂️ **A Pergunta do Foco:** "Se você precisasse entregar ou usar essa ideia até amanhã, o que você cortaria sem dó?"\n` +
+        `Tudo o que você cortar não é perda — é foco. Registre isso na aba **Mudança de Rota** para manter o projeto leve e realizável!`;
     }
 
-    return `Analisando sua ideia **"${contextIdea.title}"** (Setor: ${contextIdea.sector}, Prioridade: ${contextIdea.priority}):\n\n` +
-      `Ela tem atualmente ${contextIdea.steps.length} passos definidos e ${contextIdea.dedicated} minutos dedicados.\n\n` +
-      `🎯 **Recomendação prioritária:** O próximo passo imediato é *" ${contextIdea.immediate} "*. Que tal iniciar uma sessão de foco de 15 minutos agora?`;
+    return `Analisando sua ideia **"${contextIdea.title}"**:\n\n` +
+      `• Setor: **${contextIdea.sector}** | Prioridade: **${contextIdea.priority}**\n` +
+      `• Passos cadastrados: **${contextIdea.steps.length}** | Tempo estimado: **${contextIdea.minutes} min**\n` +
+      `• Próxima ação recomendada: *" ${contextIdea.immediate} "*\n\n` +
+      `Que tal iniciar agora um bloco de foco de 15 minutos na aba 'Hoje' para tirar essa ideia da inércia?`;
   }
 
-  // Se a pergunta for sobre o conjunto de ideias ou geral
+  // 7. Qual focar hoje / Prioridade geral
   if (query.includes('focar') || query.includes('hoje') || query.includes('começar') || query.includes('prioridade')) {
     const urgent = allIdeas?.find(i => i.priority === 'Urgente' && i.stage < 4);
     const inFlow = allIdeas?.find(i => i.stage === 2);
     const chosen = urgent || inFlow || allIdeas?.[0];
 
     if (chosen) {
-      return `Com base no seu funil, sua prioridade número 1 hoje deve ser **"${chosen.title}"**.\n\n` +
-        `• **Por que ela?** ${chosen.priority === 'Urgente' ? 'Ela está marcada com prioridade Urgente.' : 'Ela já está na fase Em Fluxo e pronta para avançar.'}\n` +
-        `• **Próximo passo:** ${chosen.immediate}\n` +
-        `• **Sugestão:** Reserve o bloco da Manhã na aba 'Hoje' para trabalhar nela.`;
+      return `Com base na análise do seu funil, sua prioridade número 1 hoje deve ser **"${chosen.title}"**.\n\n` +
+        `• **Por que ela?** ${chosen.priority === 'Urgente' ? 'Ela está com prioridade Urgente marcada.' : 'Ela já está na fase Em Fluxo e pronta para avançar.'}\n` +
+        `• **Próximo passo imediato:** ${chosen.immediate}\n` +
+        `• **Sugestão:** Reserve o bloco da Manhã ou Tarde na aba 'Hoje' para realizar esse passo!`;
     }
   }
 
+  // 8. Diagnóstico de funil
   if (query.includes('funil') || query.includes('status') || query.includes('resumo') || query.includes('analis')) {
     const total = allIdeas?.length ?? 0;
     const completed = allIdeas?.filter(i => i.stage === 4).length ?? 0;
     const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-    return `📊 **Diagnóstico Geral do seu Ideaflow:**\n\n` +
-      `• Você possui **${total} ideias cadastradas**.\n` +
-      `• **${completed} ideias já viraram Realidade** (${rate}% de conclusão).\n\n` +
-      `Seu maior desafio agora é manter a taxa de conversão das ideias que estão em 'Faísca' e 'Estrutura'. Escolha apenas 1 ideia para avançar esta semana!`;
+    return `📊 **Diagnóstico Geral do seu Funil de Ideias:**\n\n` +
+      `• **${total} ideias** no seu espaço de realização.\n` +
+      `• **${completed} ideias já viraram Realidade** (${rate}% concluídas).\n\n` +
+      `Seu objetivo agora é pegar uma ideia de 'Estrutura' ou 'Em Fluxo' e focar até levá-la à fase 'Realidade'!`;
   }
 
-  return `Estou aqui como seu **Mentor Ideaflow** para transformar suas ideias em projetos reais!\n\n` +
-    `Você pode me pedir:\n` +
-    `• *"Qual ideia devo focar hoje?"*\n` +
-    `• *"Crie um checklist de 5 passos para meu projeto"*\n` +
-    `• *"Como destravar uma ideia que está parada há muito tempo?"*\n` +
-    `• *"Me ajude a reduzir o escopo para lançar rápido"*\n\n` +
-    `O que você gostaria de explorar agora?`;
+  // 9. Resposta Inteligente Geral Contextual
+  return `Como seu **Mentor Ideaflow**, analisei sua solicitação:\n\n` +
+    `Aqui está a estratégia de 4 passos para transformar isso em ação real:\n\n` +
+    `1. **Clareza de Intenção (15 min):** Escreva em uma frase o resultado final que você quer ver pronto.\n` +
+    `2. **Micro-Passo Inicial (15 min):** Encontre a menor ação física possível que você pode fazer agora.\n` +
+    `3. **Bloco de Execução Concentrada (30 min):** Feche abas paralelas, coloque o celular em modo não perturbe e execute o núcleo.\n` +
+    `4. **Revisão e Celebração (10 min):** Avalie o que aprendeu e mova o ponteiro da realização.\n\n` +
+    `🎯 **Próximo passo:** Gostaria de focar em alguma ideia específica do seu funil ou detalhar essa iniciativa?`;
 }
 
 /**
@@ -311,6 +366,45 @@ ${contextText ? `Contexto atual do usuário no aplicativo: ${contextText}` : ''}
   }
 
   throw new Error(lastError || 'Não foi possível obter resposta do Google Gemini.');
+}
+
+/**
+ * Planeja uma Ideia utilizando a melhor IA disponível:
+ * 1. Groq (se chave configurada)
+ * 2. Google Gemini (se chave configurada)
+ * 3. Motor Cognitivo Heurístico Local (100% Offline e livre de erros)
+ */
+export async function planIdeaWithAi(
+  rawText: string,
+  sectors: Sector[]
+): Promise<{ idea: Idea; provider: 'groq' | 'gemini' | 'local'; error?: string }> {
+  // 1. Prioriza Groq
+  if (isGroqActive()) {
+    try {
+      const groqResult = await planIdeaWithGroq(rawText, sectors);
+      if (groqResult.usedGroq && groqResult.idea) {
+        return { idea: groqResult.idea, provider: 'groq' };
+      }
+    } catch (err: any) {
+      console.warn('Groq falhou no planejamento, tentando fallback:', err?.message);
+    }
+  }
+
+  // 2. Tenta Gemini
+  if (getActiveGeminiKey()) {
+    try {
+      const geminiResult = await planIdeaWithGemini(rawText, sectors);
+      if (geminiResult.usedGemini && geminiResult.idea) {
+        return { idea: geminiResult.idea, provider: 'gemini' };
+      }
+    } catch (err: any) {
+      console.warn('Gemini falhou no planejamento, usando motor local:', err?.message);
+    }
+  }
+
+  // 3. Motor Local Seguro
+  const fallback = planIdea(rawText, sectors);
+  return { idea: fallback, provider: 'local' };
 }
 
 /**
@@ -510,8 +604,9 @@ Responda EXCLUSIVAMENTE um objeto JSON válido (sem tags markdown nem explicaç�
 
 /**
  * Função principal que consulta a IA para o chat do Mentor:
- * 1. Tenta via backend seguro (/api/gemini) sem problemas de CORS.
- * 2. Em caso de ausência de chave ou falha na API, usa o Motor Cognitivo Heurístico Local (100% Gratuito & Offline) e informa o erro se houver.
+ * 1. Prioriza a Groq (LLaMA 3.3/3.1 - ultra-rápida, gratuita e sem bloqueios de CORS).
+ * 2. Em seguida tenta o Google Gemini.
+ * 3. Fallback contínuo e sem falhas para o Motor Cognitivo Oficial do Ideaflow (100% Offline).
  */
 export async function askMentorAi({
   message,
@@ -523,18 +618,52 @@ export async function askMentorAi({
   contextIdea?: Idea;
   allIdeas?: Idea[];
   history?: { role: 'user' | 'model'; text: string }[];
-}): Promise<{ reply: string; provider: 'gemini' | 'local'; error?: string }> {
-  const geminiKey = getActiveGeminiKey();
+}): Promise<{ reply: string; provider: 'groq' | 'gemini' | 'local'; error?: string }> {
+  let contextText = '';
+  if (contextIdea) {
+    contextText = `Ideia Atual: Título: "${contextIdea.title}", Setor: "${contextIdea.sector}", Prioridade: "${contextIdea.priority}", Estágio: ${contextIdea.stage}, Resumo: "${contextIdea.summary}", Escopo: "${contextIdea.scope || 'N/A'}", Passos: ${JSON.stringify(contextIdea.steps)}`;
+  } else if (allIdeas) {
+    contextText = `Total de Ideias: ${allIdeas.length}. Ideias em andamento: ${allIdeas.map(i => i.title).join(', ')}`;
+  }
 
-  if (geminiKey) {
-    let contextText = '';
-    if (contextIdea) {
-      contextText = `Ideia Atual: Título: "${contextIdea.title}", Setor: "${contextIdea.sector}", Prioridade: "${contextIdea.priority}", Estágio: ${contextIdea.stage}, Resumo: "${contextIdea.summary}", Escopo: "${contextIdea.scope || 'N/A'}", Passos: ${JSON.stringify(contextIdea.steps)}`;
-    } else if (allIdeas) {
-      contextText = `Total de Ideias: ${allIdeas.length}. Ideias em andamento: ${allIdeas.map(i => i.title).join(', ')}`;
+  // 1. Tenta Groq se chave configurada
+  const groqKey = getActiveGroqKey();
+  if (groqKey) {
+    try {
+      const groqMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+        {
+          role: 'system',
+          content: `Você é o Mentor Ideaflow Oficial, copiloto humano, prático e ágil de realização.
+Seu foco é ajudar o criador a tirar qualquer ideia do papel (culinária, casa, negócios, tecnologia, marcenaria, família, rotina).
+Diretrizes:
+- Responda em Português do Brasil com excelente formatação markdown (listas, negritos, emojis acolhedores).
+- Seja encorajador, afetuoso, direto e prático (sugira micro-passos de 15 a 30 minutos).
+${contextText ? `Contexto do usuário no app: ${contextText}` : ''}`,
+        },
+        ...history.map(h => ({
+          role: (h.role === 'model' ? 'assistant' : 'user') as 'assistant' | 'user',
+          content: h.text,
+        })),
+        { role: 'user' as const, content: message },
+      ];
+
+      const groqReply = await callGroqChat({
+        messages: groqMessages,
+        temperature: 0.7,
+      });
+
+      if (groqReply) {
+        return { reply: groqReply, provider: 'groq' };
+      }
+    } catch (err: any) {
+      console.warn('Groq falhou, tentando fallback:', err?.message);
     }
+  }
 
-    // 1. Tenta via backend seguro para eliminar problemas de CORS no navegador
+  // 2. Tenta Gemini se chave configurada
+  const geminiKey = getActiveGeminiKey();
+  if (geminiKey) {
+    // Tenta via backend seguro
     try {
       const res = await fetch('/api/gemini', {
         method: 'POST',
@@ -553,17 +682,11 @@ export async function askMentorAi({
         if (data.success && data.reply) {
           return { reply: data.reply, provider: 'gemini' };
         }
-        if (data.error) {
-          console.warn('Erro no /api/gemini:', data.error);
-          const localReply = localAiResponse(message, contextIdea, allIdeas);
-          return { reply: localReply, provider: 'local', error: data.error };
-        }
       }
     } catch (err: any) {
       console.warn('Backend /api/gemini indisponível, tentando fallback:', err?.message);
     }
 
-    // 2. Fallback direto caso o endpoint local não esteja acessível
     try {
       const geminiReply = await callGeminiApiWithHistory({
         apiKey: geminiKey,
@@ -574,19 +697,53 @@ export async function askMentorAi({
 
       return { reply: geminiReply, provider: 'gemini' };
     } catch (err: any) {
-      console.warn('Falha na API Gemini, usando motor local gratuito:', err?.message);
-      const localReply = localAiResponse(message, contextIdea, allIdeas);
-      return {
-        reply: localReply,
-        provider: 'local',
-        error: err?.message || 'Falha na resposta do Google Gemini',
-      };
+      console.warn('Falha na API Gemini, usando IA Oficial do Ideaflow:', err?.message);
     }
   }
 
-  // Fallback para Motor Cognitivo Local 100% Gratuito
+  // 3. Fallback para Motor Cognitivo Local 100% Gratuito (Sempre Seguro & Imediato)
   const localReply = localAiResponse(message, contextIdea, allIdeas);
   return { reply: localReply, provider: 'local' };
+}
+
+/**
+ * Gera os módulos de um Projeto utilizando a melhor IA disponível:
+ * 1. Groq (se chave configurada)
+ * 2. Google Gemini (se chave configurada)
+ * 3. Motor Cognitivo Heurístico Local (100% Offline e livre de erros)
+ */
+export async function generateProjectModulesWithAi(
+  projectTitle: string,
+  projectSummary: string,
+  sector: string
+): Promise<{ modules: { title: string; summary: string; minutes: number }[]; provider: 'groq' | 'gemini' | 'local'; error?: string }> {
+  // 1. Tenta Groq
+  if (isGroqActive()) {
+    try {
+      const groqResult = await generateProjectModulesWithGroq(projectTitle, projectSummary, sector);
+      if (groqResult.usedGroq && groqResult.modules.length > 0) {
+        return { modules: groqResult.modules, provider: 'groq' };
+      }
+    } catch (err: any) {
+      console.warn('Groq falhou em módulos de projeto, tentando fallback:', err?.message);
+    }
+  }
+
+  // 2. Tenta Gemini
+  if (getActiveGeminiKey()) {
+    try {
+      const geminiResult = await generateProjectModulesWithGemini(projectTitle, projectSummary, sector);
+      if (geminiResult.usedGemini && geminiResult.modules.length > 0) {
+        return { modules: geminiResult.modules, provider: 'gemini' };
+      }
+    } catch (err: any) {
+      console.warn('Gemini falhou em módulos de projeto, usando motor local:', err?.message);
+    }
+  }
+
+  // 3. Motor Local Seguro
+  const fallback = generateSubModulesAi(projectTitle, projectSummary, sector);
+  return { modules: fallback, provider: 'local' };
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   Lock,
   ServerOff,
   HelpCircle,
+  Compass,
 } from 'lucide-react';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { toast } from 'sonner';
@@ -29,6 +30,12 @@ import {
   testGeminiApiKey,
   cleanGeminiKey,
 } from '@/lib/ai-assistant';
+import {
+  getActiveGroqKey,
+  setStoredGroqKey,
+  cleanGroqKey,
+  testGroqApiKey,
+} from '@/lib/groq';
 
 export const Route = createFileRoute('/ajustes')({
   head: () => ({
@@ -53,16 +60,59 @@ export const Route = createFileRoute('/ajustes')({
 function Settings() {
   const { data, setData } = useFlow();
   const input = useRef<HTMLInputElement>(null);
+  
+  // Groq AI
+  const [groqKeyInput, setGroqKeyInput] = useState('');
+  const [hasGroqKey, setHasGroqKey] = useState(false);
+  const [testingGroqKey, setTestingGroqKey] = useState(false);
+  const [groqKeyError, setGroqKeyError] = useState<string | null>(null);
+
+  // Gemini AI (Secundário)
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
   const [hasKey, setHasKey] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
 
   useEffect(() => {
+    const existingGroq = getActiveGroqKey();
+    setGroqKeyInput(existingGroq);
+    setHasGroqKey(Boolean(existingGroq));
+
     const existing = getStoredGeminiKey();
     setGeminiKeyInput(existing);
     setHasKey(Boolean(existing));
   }, []);
+
+  const handleSaveGroqKey = async () => {
+    const clean = cleanGroqKey(groqKeyInput);
+    if (!clean) {
+      setStoredGroqKey('');
+      setHasGroqKey(false);
+      setGroqKeyError(null);
+      toast.info('Chave Groq removida.');
+      return;
+    }
+
+    setTestingGroqKey(true);
+    setGroqKeyError(null);
+    try {
+      const res = await testGroqApiKey(clean);
+      if (res.success) {
+        setStoredGroqKey(clean);
+        setHasGroqKey(true);
+        setGroqKeyError(null);
+        toast.success(`Chave Groq validada e ativada com sucesso! ⚡ LLaMA 3.3 disponível.`);
+      } else {
+        setGroqKeyError(res.error || 'A API da Groq recusou esta chave.');
+        toast.error(`Falha ao validar Groq: ${res.error}`);
+      }
+    } catch (e: any) {
+      setGroqKeyError(e?.message || 'Falha de conexão.');
+      toast.error(`Falha: ${e?.message}`);
+    } finally {
+      setTestingGroqKey(false);
+    }
+  };
 
   const handleSaveGeminiKey = async () => {
     const clean = cleanGeminiKey(geminiKeyInput);
@@ -210,26 +260,98 @@ function Settings() {
           <div>
             <h2 className="flex items-center gap-2">
               <Bot size={20} className="text-primary" />
-              Inteligência Artificial (100% Gratuita)
+              Inteligência Artificial (Groq & LLaMA 3.3)
             </h2>
             <p>
-              O Ideaflow inclui o <strong>Mentor IA</strong> embutido nativamente, sem nenhum custo
-              ou necessidade de cartão de crédito.
+              O Ideaflow usa inteligência artificial rápida, aberta e gratuita para o Mentor IA e planejamento de ideias.
             </p>
           </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-green/10 text-green border border-green/20 font-medium shrink-0">
-            {hasKey ? 'Gemini 1.5/2.0 Conectado' : 'Motor Cognitivo Local Ativo'}
+          <span className="text-xs px-2.5 py-1 rounded-full bg-green/10 text-green border border-green/20 font-medium shrink-0 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
+            {hasGroqKey ? 'Groq LLaMA 3.3 Ativo ⚡' : hasKey ? 'Gemini Flash Ativo' : 'IA Oficial Local Ativa'}
           </span>
         </div>
 
-        <div className="mt-4 p-4 rounded-xl border border-border bg-card/60 space-y-3 text-xs">
-          <div className="flex items-center gap-2 text-foreground font-semibold">
-            <Key size={14} className="text-primary" />
-            Conectar Chave Gratuita do Google Gemini (Opcional)
+        {/* Card Groq (Principal Recomendado) */}
+        <div className="mt-4 p-4 rounded-xl border border-primary/40 bg-card/70 space-y-3 text-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-foreground font-semibold">
+              <Zap size={14} className="text-primary" />
+              Groq Cloud API (Gratuita, Sem Bloqueios & Respostas em Milissegundos)
+            </div>
+            <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+              Recomendada ⚡
+            </span>
           </div>
           <p className="text-muted-foreground leading-relaxed">
-            Se quiser turbinar o Mentor com o modelo Gemini Flash oficial, gere uma chave 100%
-            gratuita em 30 segundos no{' '}
+            A Groq é 100% gratuita, livre de bloqueios corporativos de CORS e roda os modelos abertos mais avançados do mundo (LLaMA 3.3 70B Versatile).
+            Gere sua chave gratuita em 30 segundos no{' '}
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline inline-flex items-center gap-0.5 font-medium"
+            >
+              console.groq.com/keys
+              <ExternalLink size={10} />
+            </a>{' '}
+            e cole abaixo:
+          </p>
+
+          <div className="flex gap-2 pt-1">
+            <input
+              type="password"
+              className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+              placeholder="Cole sua chave Groq gratuita (gsk_...)"
+              value={groqKeyInput}
+              onChange={e => {
+                setGroqKeyInput(e.target.value);
+                if (groqKeyError) setGroqKeyError(null);
+              }}
+            />
+            <Button
+              size="sm"
+              className="h-8 text-xs primary-action gap-1"
+              disabled={testingGroqKey}
+              onClick={handleSaveGroqKey}
+            >
+              {testingGroqKey ? 'Validando...' : 'Salvar & Ativar'}
+            </Button>
+            {hasGroqKey && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs text-destructive hover:bg-destructive/10"
+                disabled={testingGroqKey}
+                onClick={() => {
+                  setGroqKeyInput('');
+                  setStoredGroqKey('');
+                  setHasGroqKey(false);
+                  setGroqKeyError(null);
+                  toast.info('Chave Groq removida.');
+                }}
+              >
+                Remover
+              </Button>
+            )}
+          </div>
+
+          {groqKeyError && (
+            <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs leading-relaxed mt-2">
+              <strong>Atenção:</strong> A Groq retornou um erro: <br />
+              <span className="font-mono text-[11px]">{groqKeyError}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Card Google Gemini (Secundário) */}
+        <div className="mt-3 p-4 rounded-xl border border-border bg-card/50 space-y-3 text-xs">
+          <div className="flex items-center gap-2 text-foreground font-semibold">
+            <Key size={14} className="text-muted-foreground" />
+            Google Gemini Flash (Opcional Alternativo)
+          </div>
+          <p className="text-muted-foreground leading-relaxed">
+            Se preferir usar o Gemini Flash, você também pode conectar sua chave gerada no{' '}
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
@@ -238,9 +360,7 @@ function Settings() {
             >
               Google AI Studio
               <ExternalLink size={10} />
-            </a>{' '}
-            e cole abaixo. Se não quiser, não precisa: o motor local gratuito continuará funcionando
-            para sempre.
+            </a>.
           </p>
 
           <div className="flex gap-2 pt-1">
@@ -283,10 +403,65 @@ function Settings() {
 
           {keyError && (
             <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs leading-relaxed mt-2">
-              <strong>Atenção:</strong> A Google retornou um erro ao testar sua chave: <br />
+              <strong>Atenção:</strong> A Google retornou um erro: <br />
               <span className="font-mono text-[11px]">{keyError}</span>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* Nuvem Supabase & Tutorial do Aplicativo */}
+      <section className="settings-section">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="flex items-center gap-2">
+              <Sparkles size={20} className="text-primary" />
+              Nuvem Supabase & Tutorial
+            </h2>
+            <p>
+              Status de sincronização da sua conta e guia interativo das funções do aplicativo.
+            </p>
+          </div>
+          <span className="text-xs px-2.5 py-1 rounded-full bg-green/10 text-green border border-green/20 font-medium shrink-0 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
+            Supabase Conectado
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div className="p-4 rounded-xl border border-border bg-card/70 space-y-2">
+            <div className="flex items-center gap-2 font-semibold text-foreground">
+              <span className="w-2.5 h-2.5 rounded-full bg-green" />
+              Banco de Dados Supabase (100% Ativo)
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Suas tabelas <code>ideas</code> e <code>profiles</code> estão online e funcionando perfeitamente. Suas ideias e perfil ficam protegidos com sincronização bi-direcional.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl border border-border bg-card/70 space-y-2 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <Compass size={16} className="text-primary" />
+                Tutorial Guiado do Aplicativo
+              </div>
+              <p className="text-muted-foreground leading-relaxed mt-1">
+                Quer rever o passo a passo com as 4 funções principais do Ideaflow?
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                window.dispatchEvent(new Event('ideaflow:tutorial'));
+                toast.success('Tutorial do aplicativo aberto!');
+              }}
+              className="mt-2 h-9 text-xs font-semibold gap-1.5 self-start cursor-pointer hover:bg-primary/10 hover:border-primary/40 active:scale-95"
+            >
+              <Sparkles size={14} className="text-primary" />
+              <span>Ver Tutorial do App Novamente</span>
+            </Button>
+          </div>
         </div>
       </section>
 

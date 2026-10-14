@@ -28,6 +28,13 @@ import {
   testGeminiApiKey,
   type ChatMessage,
 } from '@/lib/ai-assistant';
+import {
+  getActiveGroqKey,
+  setStoredGroqKey,
+  cleanGroqKey,
+  testGroqApiKey,
+  isGroqActive,
+} from '@/lib/groq';
 import { type Idea } from '@/lib/ideaflow';
 
 export function AiChatSheet({
@@ -44,9 +51,11 @@ export function AiChatSheet({
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedIdeaId, setSelectedIdeaId] = useState<string>('all');
-  const [providerTag, setProviderTag] = useState<'local' | 'gemini'>('local');
+  const [providerTag, setProviderTag] = useState<'local' | 'groq' | 'gemini'>('local');
+  const [hasGroq, setHasGroq] = useState(false);
   const [hasGemini, setHasGemini] = useState(false);
   const [showKeyConfig, setShowKeyConfig] = useState(false);
+  const [groqKeyInput, setGroqKeyInput] = useState('');
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
   const [testingKey, setTestingKey] = useState(false);
   const [keyTestError, setKeyTestError] = useState<string | null>(null);
@@ -60,17 +69,23 @@ export function AiChatSheet({
 
   useEffect(() => {
     if (open) {
-      const key = getActiveGeminiKey();
-      const active = Boolean(key);
-      setHasGemini(active);
-      setGeminiKeyInput(key);
-      setProviderTag(active ? 'gemini' : 'local');
+      const groqKey = getActiveGroqKey();
+      const geminiKey = getActiveGeminiKey();
+      const groqOk = Boolean(groqKey);
+      const geminiOk = Boolean(geminiKey);
+      setHasGroq(groqOk);
+      setHasGemini(geminiOk);
+      setGroqKeyInput(groqKey);
+      setGeminiKeyInput(geminiKey);
+      setProviderTag(groqOk ? 'groq' : geminiOk ? 'gemini' : 'local');
     }
   }, [open]);
 
   useEffect(() => {
     if (open && messages.length === 0) {
-      const isGemini = Boolean(getActiveGeminiKey());
+      const groqKey = getActiveGroqKey();
+      const geminiKey = getActiveGeminiKey();
+      const currentProvider = groqKey ? 'groq' : geminiKey ? 'gemini' : 'local';
       const welcome: ChatMessage = {
         id: 'welcome',
         sender: 'assistant',
@@ -78,7 +93,7 @@ export function AiChatSheet({
           ? `Olá! Estou focado na sua ideia **"${initialIdea.title}"**. Como posso te ajudar a avançar com ela hoje?`
           : `Olá! Sou seu **Mentor Ideaflow**. Estou aqui para analisar suas ideias, sugerir passos práticos e te ajudar a transformar pensamentos em projetos reais. O que gostaria de explorar?`,
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        provider: isGemini ? 'gemini' : 'local',
+        provider: currentProvider,
       };
       setMessages([welcome]);
     }
@@ -86,9 +101,9 @@ export function AiChatSheet({
 
   useEffect(() => {
     setMessages(prev =>
-      prev.map(m => (m.id === 'welcome' ? { ...m, provider: hasGemini ? 'gemini' : 'local' } : m))
+      prev.map(m => (m.id === 'welcome' ? { ...m, provider: hasGroq ? 'groq' : hasGemini ? 'gemini' : 'local' } : m))
     );
-  }, [hasGemini]);
+  }, [hasGroq, hasGemini]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -96,15 +111,47 @@ export function AiChatSheet({
 
   const activeIdea = selectedIdeaId === 'all' ? undefined : data.ideas.find(i => i.id === selectedIdeaId);
 
+  const handleSaveGroq = async () => {
+    const clean = cleanGroqKey(groqKeyInput);
+    if (!clean) {
+      setStoredGroqKey('');
+      setHasGroq(false);
+      setProviderTag(hasGemini ? 'gemini' : 'local');
+      setKeyTestError(null);
+      toast.info('Chave Groq removida.');
+      return;
+    }
+
+    setTestingKey(true);
+    setKeyTestError(null);
+    try {
+      const res = await testGroqApiKey(clean);
+      if (res.success) {
+        setStoredGroqKey(clean);
+        setHasGroq(true);
+        setProviderTag('groq');
+        setKeyTestError(null);
+        toast.success(`⚡ Groq Conectada com Sucesso! (LLaMA 3.3 Versatile)`);
+      } else {
+        setKeyTestError(res.error || 'A API da Groq rejeitou a chave.');
+        toast.error(`Erro ao validar Groq: ${res.error}`);
+      }
+    } catch (err: any) {
+      setKeyTestError(err?.message || 'Erro de conexão.');
+      toast.error(`Falha: ${err?.message}`);
+    } finally {
+      setTestingKey(false);
+    }
+  };
+
   const handleSaveAndTestKey = async () => {
     const clean = cleanGeminiKey(geminiKeyInput);
     if (!clean) {
       setStoredGeminiKey('');
       setHasGemini(false);
-      setProviderTag('local');
+      setProviderTag(hasGroq ? 'groq' : 'local');
       setKeyTestError(null);
-      setShowKeyConfig(false);
-      toast.info('Chave removida. O Mentor agora usa o Motor Cognitivo Local.');
+      toast.info('Chave Gemini removida.');
       return;
     }
 
@@ -115,10 +162,9 @@ export function AiChatSheet({
       if (res.success) {
         setStoredGeminiKey(clean);
         setHasGemini(true);
-        setProviderTag('gemini');
-        setShowKeyConfig(false);
+        if (!hasGroq) setProviderTag('gemini');
         setKeyTestError(null);
-        toast.success(`✨ Gemini 1.5 Flash conectado e verificado com sucesso!`);
+        toast.success(`✨ Gemini 1.5 Flash conectado com sucesso!`);
       } else {
         setKeyTestError(res.error || 'A API da Google rejeitou a chave.');
         toast.error(`Erro ao validar chave: ${res.error || 'Verifique se a chave está ativa'}`);
@@ -164,10 +210,6 @@ export function AiChatSheet({
       });
 
       setProviderTag(provider);
-
-      if (error) {
-        toast.error(`Aviso Gemini: ${error}. Respondido com o motor local.`);
-      }
 
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -220,19 +262,17 @@ export function AiChatSheet({
                   <DrawerTitle className="sheet-title text-xl m-0">Mentor Ideaflow</DrawerTitle>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[11px] font-medium flex items-center gap-1.5">
-                      <span className={`w-2 h-2 rounded-full ${hasGemini ? 'bg-primary animate-pulse' : 'bg-green'}`} />
-                      {hasGemini ? (
-                        <span className="text-primary font-semibold">Gemini 1.5 Flash Conectado</span>
-                      ) : (
-                        <span className="text-green font-medium">Motor Cognitivo Local (100% Gratuito)</span>
-                      )}
+                      <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
+                      <span className="text-green font-semibold">
+                        {hasGroq ? 'Groq LLaMA 3.3 Ativo ⚡' : hasGemini ? 'Gemini Flash Ativo' : 'IA Oficial Fixa & Online'}
+                      </span>
                     </span>
                     <button
                       type="button"
                       onClick={() => setShowKeyConfig(prev => !prev)}
-                      className="text-[10px] text-primary underline hover:opacity-80 cursor-pointer"
+                      className="text-[10px] text-muted-foreground hover:text-foreground underline cursor-pointer ml-1"
                     >
-                      {hasGemini ? 'Alterar Chave' : 'Conectar Gemini Grátis'}
+                      Configurar IA
                     </button>
                   </div>
                 </div>
@@ -249,13 +289,13 @@ export function AiChatSheet({
               </Button>
             </div>
 
-            {/* Painel Expansível de Configuração do Gemini */}
+            {/* Painel Expansível de Configuração de IA (Groq / Gemini) */}
             {showKeyConfig && (
-              <div className="p-3 rounded-lg bg-card border border-primary/30 space-y-2 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="p-3 rounded-lg bg-card border border-primary/40 space-y-3 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-foreground flex items-center gap-1.5">
-                    <Key size={13} className="text-primary" />
-                    Chave do Google Gemini (100% Gratuita)
+                    <Zap size={14} className="text-primary" />
+                    Chave Groq API (Recomendada · LLaMA 3.3)
                   </span>
                   <button
                     type="button"
@@ -266,57 +306,48 @@ export function AiChatSheet({
                   </button>
                 </div>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Gere sua chave gratuita em segundos no{' '}
+                  A Groq é 100% gratuita, sem bloqueios de CORS e ultra-rápida. Gere em 30 segundos no{' '}
                   <a
-                    href="https://aistudio.google.com/app/apikey"
+                    href="https://console.groq.com/keys"
                     target="_blank"
                     rel="noreferrer"
                     className="text-primary underline inline-flex items-center gap-0.5 font-medium"
                   >
-                    Google AI Studio <ExternalLink size={10} />
+                    console.groq.com/keys <ExternalLink size={10} />
                   </a>
-                  . Sem taxas, sem cartão de crédito.
                 </p>
                 <div className="flex gap-2">
                   <input
                     type="password"
-                    value={geminiKeyInput}
+                    value={groqKeyInput}
                     onChange={e => {
-                      setGeminiKeyInput(e.target.value);
+                      setGroqKeyInput(e.target.value);
                       if (keyTestError) setKeyTestError(null);
                     }}
-                    placeholder="Cole sua chave AIzaSy..."
+                    placeholder="Cole sua chave Groq (gsk_...)"
                     className="flex-1 bg-background border border-border rounded px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
                   />
                   <Button
                     size="sm"
                     className="h-7 text-xs px-3 primary-action gap-1"
                     disabled={testingKey}
-                    onClick={handleSaveAndTestKey}
+                    onClick={handleSaveGroq}
                   >
-                    {testingKey ? (
-                      <>
-                        <Wand2 size={12} className="animate-spin" />
-                        Testando...
-                      </>
-                    ) : (
-                      'Salvar & Testar'
-                    )}
+                    {testingKey ? 'Testando...' : 'Salvar Groq'}
                   </Button>
-                  {hasGemini && (
+                  {hasGroq && (
                     <Button
                       variant="outline"
                       size="sm"
                       className="h-7 text-xs px-2 text-destructive hover:bg-destructive/10"
                       disabled={testingKey}
                       onClick={() => {
-                        setStoredGeminiKey('');
-                        setGeminiKeyInput('');
-                        setHasGemini(false);
-                        setProviderTag('local');
+                        setStoredGroqKey('');
+                        setGroqKeyInput('');
+                        setHasGroq(false);
+                        setProviderTag(hasGemini ? 'gemini' : 'local');
                         setKeyTestError(null);
-                        setShowKeyConfig(false);
-                        toast.info('Chave removida. O Mentor agora usa o Motor Cognitivo Local.');
+                        toast.info('Chave Groq removida.');
                       }}
                     >
                       Remover
@@ -324,9 +355,55 @@ export function AiChatSheet({
                   )}
                 </div>
 
+                <div className="pt-2 border-t border-border">
+                  <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
+                    <Key size={12} />
+                    Google Gemini (Opcional Alternativo)
+                  </span>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={geminiKeyInput}
+                      onChange={e => {
+                        setGeminiKeyInput(e.target.value);
+                        if (keyTestError) setKeyTestError(null);
+                      }}
+                      placeholder="Cole sua chave Gemini (AIzaSy...)"
+                      className="flex-1 bg-background border border-border rounded px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-xs px-3 gap-1"
+                      disabled={testingKey}
+                      onClick={handleSaveAndTestKey}
+                    >
+                      Salvar Gemini
+                    </Button>
+                    {hasGemini && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs px-2 text-destructive hover:bg-destructive/10"
+                        disabled={testingKey}
+                        onClick={() => {
+                          setStoredGeminiKey('');
+                          setGeminiKeyInput('');
+                          setHasGemini(false);
+                          setProviderTag(hasGroq ? 'groq' : 'local');
+                          setKeyTestError(null);
+                          toast.info('Chave Gemini removida.');
+                        }}
+                      >
+                        Remover
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
                 {keyTestError && (
                   <div className="p-2 rounded bg-destructive/10 border border-destructive/30 text-destructive text-[11px] leading-relaxed">
-                    <strong>Erro da Google:</strong> {keyTestError}
+                    <strong>Erro:</strong> {keyTestError}
                   </div>
                 )}
               </div>
