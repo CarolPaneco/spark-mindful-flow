@@ -1,0 +1,4 @@
+- Ideaflow stores domain data in a versioned, validated browser-local store managed by FlowProvider because the product explicitly requires offline LocalStorage persistence.
+- Each primary navigation view is a TanStack file route; capture, details and focus are shared drawers so mobile flows preserve page context.
+- Offline support uses vite-plugin-pwa generateSW and a single guarded registration module; never register the app-shell worker in development or editor previews.
+- Idea planning uses an explicitly labeled local heuristic engine; optional remote AI credentials must use a secure server boundary, never browser storage.

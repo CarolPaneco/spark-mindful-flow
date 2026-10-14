@@ -1,0 +1,955 @@
+import { useEffect, useState } from 'react';
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Clock3,
+  Play,
+  Trash2,
+  CalendarPlus,
+  Sparkles,
+  BarChart2,
+  ListTodo,
+  GitFork,
+  BookOpen,
+  CalendarDays,
+  Plus,
+  Compass,
+  ExternalLink,
+  Download,
+  AlertCircle,
+  Lightbulb,
+  History,
+  Pencil,
+  CheckSquare,
+} from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
+import { Button } from '@/components/ui/button';
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
+import { useFlow } from '@/components/flow-provider';
+import {
+  formatMinutes,
+  localDate,
+  stageNames,
+  stageTones,
+  generateAiSteps,
+  getAiCoachingInsights,
+  createGoogleCalendarUrl,
+  downloadIcsFile,
+  type Idea,
+  type Stage,
+  type Step,
+  type PivotRecord,
+  type IdeaNote,
+  type DayBlock,
+} from '@/lib/ideaflow';
+import { toast } from 'sonner';
+
+type Tab = 'overview' | 'steps' | 'pivots' | 'notes' | 'calendar' | 'coach';
+
+export function IdeaDetail({
+  ideaId,
+  onClose,
+  onFocus,
+}: {
+  ideaId: string | null;
+  onClose: () => void;
+  onFocus: (idea: Idea) => void;
+}) {
+  const { data, updateIdea, setData } = useFlow();
+  const [tab, setTab] = useState<Tab>('overview');
+  const [mounted, setMounted] = useState(false);
+
+  // Estados para Mudança de Rota (Pivô)
+  const [showPivotForm, setShowPivotForm] = useState(false);
+  const [pivotType, setPivotType] = useState<PivotRecord['type']>('Redução de Escopo');
+  const [newScope, setNewScope] = useState('');
+  const [pivotReason, setPivotReason] = useState('');
+
+  // Estados para Anotações
+  const [noteText, setNoteText] = useState('');
+
+  // Estados para Passos
+  const [newStepText, setNewStepText] = useState('');
+  const [newStepMinutes, setNewStepMinutes] = useState(15);
+  const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const idea = data.ideas.find(i => i.id === ideaId);
+
+  useEffect(() => {
+    if (idea) {
+      setNewScope(idea.scope ?? '');
+      setShowPivotForm(false);
+      setEditingStepIndex(null);
+    }
+  }, [ideaId]);
+
+  if (!idea) {
+    return (
+      <Drawer open={false} onOpenChange={() => onClose()}>
+        <DrawerContent />
+      </Drawer>
+    );
+  }
+
+  const completedStepsCount = idea.steps.filter(s => s.done).length;
+  const totalStepsCount = idea.steps.length;
+  const completionPercent = totalStepsCount > 0 ? Math.round((completedStepsCount / totalStepsCount) * 100) : 0;
+  const coaching = getAiCoachingInsights(idea);
+
+  // Dados para os gráficos
+  const chartStepsData = [
+    { name: 'Concluídos', value: completedStepsCount, color: 'var(--green)' },
+    { name: 'Pendentes', value: Math.max(0, totalStepsCount - completedStepsCount), color: 'var(--secondary)' },
+  ];
+
+  const timeData = [
+    { name: 'Dedicado', minutos: idea.dedicated, fill: 'var(--primary)' },
+    { name: 'Total Previsto', minutos: idea.minutes, fill: 'var(--violet)' },
+  ];
+
+  // Ações de Passos
+  const handleToggleStep = (index: number) => {
+    const updated = idea.steps.map((s, i) => (i === index ? { ...s, done: !s.done } : s));
+    updateIdea(idea.id, { steps: updated });
+  };
+
+  const handleAddStep = () => {
+    if (!newStepText.trim()) return;
+    const newStep: Step = {
+      id: crypto.randomUUID(),
+      text: newStepText.trim(),
+      minutes: Number(newStepMinutes),
+      done: false,
+    };
+    const updated = [...idea.steps, newStep];
+    const totalMinutes = updated.reduce((sum, s) => sum + s.minutes, 0);
+    updateIdea(idea.id, { steps: updated, minutes: totalMinutes });
+    setNewStepText('');
+    toast.success('Passo adicionado ao checklist!');
+  };
+
+  const handleDeleteStep = (index: number) => {
+    if (idea.steps.length <= 1) {
+      toast.error('Mantenha pelo menos um passo para orientação.');
+      return;
+    }
+    const updated = idea.steps.filter((_, i) => i !== index);
+    const totalMinutes = updated.reduce((sum, s) => sum + s.minutes, 0);
+    updateIdea(idea.id, { steps: updated, minutes: totalMinutes });
+    toast.success('Passo removido.');
+  };
+
+  const handleSuggestStepsAi = () => {
+    const aiSteps = generateAiSteps(idea.title, idea.summary, idea.sector, 'estruturado');
+    const existingTexts = new Set(idea.steps.map(s => s.text.toLowerCase()));
+    const newFiltered = aiSteps.filter(s => !existingTexts.has(s.text.toLowerCase()));
+    if (newFiltered.length === 0) {
+      toast.info('A IA analisou seus passos e você já tem um plano consistente.');
+      return;
+    }
+    const updated = [...idea.steps, ...newFiltered.slice(0, 2)];
+    const totalMinutes = updated.reduce((sum, s) => sum + s.minutes, 0);
+    updateIdea(idea.id, { steps: updated, minutes: totalMinutes });
+    toast.success('A IA adicionou 2 passos estratégicos ao seu plano ✨');
+  };
+
+  // Ações de Mudança de Rota (Pivô)
+  const handleSavePivot = () => {
+    if (!pivotReason.trim()) {
+      toast.error('Informe o motivo da mudança de rota para registrar o aprendizado.');
+      return;
+    }
+    const newPivot: PivotRecord = {
+      id: crypto.randomUUID(),
+      date: localDate(),
+      type: pivotType,
+      previousScope: idea.scope || 'Escopo inicial indefinido',
+      newScope: newScope.trim() || idea.scope || '',
+      reason: pivotReason.trim(),
+    };
+    const updatedPivots = [newPivot, ...(idea.pivots ?? [])];
+    updateIdea(idea.id, {
+      scope: newScope.trim(),
+      pivots: updatedPivots,
+    });
+    setPivotReason('');
+    setShowPivotForm(false);
+    toast.success('Mudança de rota registrada no histórico!');
+  };
+
+  // Ações de Anotações
+  const handleAddNote = () => {
+    if (!noteText.trim()) return;
+    const newNote: IdeaNote = {
+      id: crypto.randomUUID(),
+      createdAt:
+        new Date().toLocaleDateString('pt-BR') +
+        ' ' +
+        new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      text: noteText.trim(),
+    };
+    const updatedNotes = [newNote, ...(idea.notes ?? [])];
+    updateIdea(idea.id, { notes: updatedNotes });
+    setNoteText('');
+    toast.success('Anotação registrada no diário de bordo!');
+  };
+
+  const handleDeleteNote = (id: string) => {
+    const updated = (idea.notes ?? []).filter(n => n.id !== id);
+    updateIdea(idea.id, { notes: updated });
+    toast.success('Anotação removida.');
+  };
+
+  return (
+    <Drawer
+      open={Boolean(ideaId)}
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+    >
+      <DrawerContent className="max-h-[94vh]">
+        <div className="sheet-body max-w-4xl mx-auto w-full">
+          {/* Cabeçalho */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="sheet-eyebrow">
+              <Sparkles size={15} />
+              DASHBOARD DE REALIZAÇÃO DA IDEIA
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`sector-tag tone-${stageTones[idea.stage]}`}>
+                {stageNames[idea.stage]} ({completionPercent}%)
+              </span>
+            </div>
+          </div>
+
+          <DrawerTitle className="sheet-title mt-2">{idea.title}</DrawerTitle>
+          <DrawerDescription className="mt-2 text-sm text-muted-foreground leading-relaxed">
+            {idea.summary}
+          </DrawerDescription>
+
+          {/* Abas de Navegação */}
+          <div className="flex items-center gap-1.5 overflow-x-auto py-2.5 my-4 border-b border-border/70 scrollbar-none">
+            <Button
+              variant={tab === 'overview' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0"
+              onClick={() => setTab('overview')}
+            >
+              <BarChart2 size={13} />
+              Visão Geral
+            </Button>
+            <Button
+              variant={tab === 'steps' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0"
+              onClick={() => setTab('steps')}
+            >
+              <ListTodo size={13} />
+              Passos ({completedStepsCount}/{totalStepsCount})
+            </Button>
+            <Button
+              variant={tab === 'pivots' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0"
+              onClick={() => setTab('pivots')}
+            >
+              <GitFork size={13} />
+              Mudança de Rota ({idea.pivots?.length ?? 0})
+            </Button>
+            <Button
+              variant={tab === 'notes' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0"
+              onClick={() => setTab('notes')}
+            >
+              <BookOpen size={13} />
+              Diário & Notas ({idea.notes?.length ?? 0})
+            </Button>
+            <Button
+              variant={tab === 'calendar' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0"
+              onClick={() => setTab('calendar')}
+            >
+              <CalendarDays size={13} />
+              Calendário & Agenda
+            </Button>
+            <Button
+              variant={tab === 'coach' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 text-xs gap-1.5 shrink-0"
+              onClick={() => setTab('coach')}
+            >
+              <Compass size={13} />
+              IA Coach
+            </Button>
+          </div>
+
+          {/* Conteúdo das Abas */}
+
+          {/* ABA 1: VISÃO GERAL & MÉTRICAS */}
+          {tab === 'overview' && (
+            <div className="space-y-6">
+              {/* Gráficos e Métricas Chave */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-card/80 border border-border flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
+                      Progresso das Etapas
+                    </span>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <strong className="text-3xl font-display font-medium text-foreground">
+                        {completionPercent}%
+                      </strong>
+                      <span className="text-xs text-muted-foreground">
+                        ({completedStepsCount} de {totalStepsCount} passos)
+                      </span>
+                    </div>
+                  </div>
+                  <progress value={completedStepsCount} max={Math.max(1, totalStepsCount)} className="mt-4" />
+                </div>
+
+                <div className="p-4 rounded-lg bg-card/80 border border-border flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
+                      Tempo de Foco
+                    </span>
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <strong className="text-3xl font-display font-medium text-primary">
+                        {formatMinutes(idea.dedicated)}
+                      </strong>
+                      <span className="text-xs text-muted-foreground">de {formatMinutes(idea.minutes)} estimados</span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-3 flex items-center gap-1.5">
+                    <Clock3 size={13} className="text-primary" />
+                    {idea.dedicated >= idea.minutes
+                      ? 'Meta de tempo atingida!'
+                      : `Faltam cerca de ${formatMinutes(Math.max(0, idea.minutes - idea.dedicated))}`}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-card/80 border border-border flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">
+                      Estágio Atual
+                    </span>
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xl font-display font-semibold text-foreground">
+                        {stageNames[idea.stage]}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-1">
+                    {stageNames.map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-2 flex-1 rounded-full ${
+                          i <= idea.stage ? 'bg-primary' : 'bg-secondary'
+                        } transition-colors`}
+                        title={`Estágio ${i + 1}: ${stageNames[i]}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Gráfico Visual Recharts */}
+              {mounted && (
+                <div className="p-4 rounded-lg bg-card/50 border border-border">
+                  <span className="text-xs font-semibold text-muted-foreground block mb-3">
+                    Comparativo de Minutos (Dedicado vs Previsto)
+                  </span>
+                  <div className="h-36 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={timeData} layout="vertical" margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                        <XAxis type="number" unit="m" stroke="var(--muted-foreground)" fontSize={11} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'var(--card)',
+                            borderColor: 'var(--border)',
+                            fontSize: '12px',
+                          }}
+                          formatter={(value: any) => [`${value} minutos`, 'Duração']}
+                        />
+                        <Bar dataKey="minutos" radius={[0, 4, 4, 0]}>
+                          {timeData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+
+              {/* Informações de Configuração da Ideia */}
+              <div className="detail-fields">
+                <label>
+                  Setor
+                  <select value={idea.sector} onChange={e => updateIdea(idea.id, { sector: e.target.value })}>
+                    {data.sectors.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Prioridade
+                  <select
+                    value={idea.priority}
+                    onChange={e => updateIdea(idea.id, { priority: e.target.value as Idea['priority'] })}
+                  >
+                    {['Urgente', 'Importante', 'Normal'].map(p => (
+                      <option key={p}>{p}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              {/* Próximo Passo Imediato */}
+              <div className="immediate-action">
+                <span>
+                  <Sparkles size={16} />
+                  PRÓXIMA AÇÃO RECOMENDADA · 15 MIN
+                </span>
+                <p>{idea.immediate}</p>
+              </div>
+
+              {/* Escopo Resumido */}
+              <div className="p-3.5 rounded-lg border border-border/70 bg-card/60 text-xs">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <GitFork size={13} className="text-primary" />
+                    Escopo Atual Definido
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[11px] text-primary px-2"
+                    onClick={() => setTab('pivots')}
+                  >
+                    Editar / Mudar Rota
+                  </Button>
+                </div>
+                <p className="text-foreground leading-relaxed">
+                  {idea.scope || 'Nenhum escopo formal delimitado ainda. Defina os limites na aba Mudança de Rota.'}
+                </p>
+              </div>
+
+              {/* Ações Primárias */}
+              <div className="sheet-actions">
+                <Button
+                  className="primary-action gap-2"
+                  onClick={() => {
+                    onClose();
+                    onFocus(idea);
+                  }}
+                >
+                  <Play size={16} />
+                  Começar sessão de foco agora
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => {
+                    updateIdea(idea.id, { day: localDate(), block: 'Manhã' });
+                    toast.success('Ideia adicionada ao seu dia (Manhã)');
+                  }}
+                >
+                  <CalendarPlus size={16} />
+                  Planejar para hoje
+                </Button>
+              </div>
+
+              {/* Mudança de Estágio no Funil */}
+              <div className="pt-4 border-t border-border flex items-center justify-between">
+                {idea.stage < 4 ? (
+                  <Button
+                    variant="ghost"
+                    className="text-primary gap-1.5"
+                    onClick={() => {
+                      const next = (idea.stage + 1) as Stage;
+                      updateIdea(idea.id, { stage: next });
+                      toast.success(`Avançado para ${stageNames[next]}! 🚀`);
+                    }}
+                  >
+                    Avançar para {stageNames[idea.stage + 1]}
+                    <ArrowRight size={15} />
+                  </Button>
+                ) : (
+                  <span className="text-green flex items-center gap-2 text-sm font-medium">
+                    <CheckCircle2 size={18} />
+                    Esta ideia é uma Realidade concluída!
+                  </span>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive hover:bg-destructive/10"
+                  aria-label="Excluir ideia"
+                  onClick={() => {
+                    if (window.confirm('Excluir esta ideia definitivamente?')) {
+                      setData(p => ({ ...p, ideas: p.ideas.filter(i => i.id !== idea.id) }));
+                      onClose();
+                      toast.success('Ideia removida.');
+                    }
+                  }}
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ABA 2: PASSOS & CHECKLIST */}
+          {tab === 'steps' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-sm">Checklist de Realização</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Marque os passos à medida que executa ou adicione novos passos.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleSuggestStepsAi}>
+                  <Sparkles size={13} className="text-primary" />
+                  Sugerir passos com IA
+                </Button>
+              </div>
+
+              {/* Lista Interativa de Passos */}
+              <div className="space-y-2">
+                {idea.steps.map((step, index) => (
+                  <div
+                    key={step.id ?? index}
+                    className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                      step.done ? 'bg-secondary/40 border-border/50 text-muted-foreground' : 'bg-card border-border'
+                    }`}
+                  >
+                    <button
+                      className="check-box cursor-pointer shrink-0 mt-0.5"
+                      onClick={() => handleToggleStep(index)}
+                      title={step.done ? 'Marcar como não feito' : 'Marcar como concluído'}
+                    >
+                      {step.done && <Check size={14} className="text-primary" />}
+                    </button>
+
+                    <div className="flex-1 min-w-0">
+                      {editingStepIndex === index ? (
+                        <div className="flex items-center gap-2">
+                          <textarea
+                            rows={2}
+                            className="text-xs bg-background border border-primary px-2 py-1.5 rounded w-full text-foreground resize-none leading-relaxed break-words"
+                            defaultValue={step.text}
+                            autoFocus
+                            onBlur={e => {
+                              const updated = idea.steps.map((s, i) => (i === index ? { ...s, text: e.target.value } : s));
+                              updateIdea(idea.id, { steps: updated });
+                              setEditingStepIndex(null);
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <span
+                          className={`text-xs block cursor-pointer select-none leading-relaxed break-words ${
+                            step.done ? 'line-through text-muted-foreground' : 'text-foreground'
+                          }`}
+                          onClick={() => handleToggleStep(index)}
+                        >
+                          {step.text}
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="text-[11px] text-muted-foreground font-mono shrink-0 pt-0.5">{step.minutes}m</span>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+                      title="Editar texto"
+                      onClick={() => setEditingStepIndex(editingStepIndex === index ? null : index)}
+                    >
+                      <Pencil size={12} />
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                      title="Excluir passo"
+                      onClick={() => handleDeleteStep(index)}
+                    >
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Formulário para Adicionar Novo Passo */}
+              <div className="p-3.5 rounded-lg border border-dashed border-border bg-card/40 mt-4">
+                <span className="text-xs font-semibold text-muted-foreground block mb-2">
+                  Adicionar Novo Passo
+                </span>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <textarea
+                    rows={2}
+                    className="flex-1 bg-background border border-border rounded px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground resize-none leading-relaxed break-words"
+                    placeholder="Ex: Agendar reunião de alinhamento com 2 pessoas..."
+                    value={newStepText}
+                    onChange={e => setNewStepText(e.target.value)}
+                  />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <select
+                      className="w-24 bg-background border border-border rounded px-2 h-8 text-xs"
+                      value={newStepMinutes}
+                      onChange={e => setNewStepMinutes(Number(e.target.value))}
+                    >
+                      <option value={10}>10 min</option>
+                      <option value={15}>15 min</option>
+                      <option value={25}>25 min</option>
+                      <option value={30}>30 min</option>
+                      <option value={45}>45 min</option>
+                      <option value={60}>1h</option>
+                    </select>
+                    <Button size="sm" className="h-8 text-xs gap-1" onClick={handleAddStep} disabled={!newStepText.trim()}>
+                      <Plus size={14} />
+                      Adicionar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ABA 3: MUDANÇA DE ROTA & ESCOPO (PIVÔ) */}
+          {tab === 'pivots' && (
+            <div className="space-y-5">
+              <div className="p-4 rounded-lg bg-card border border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    <Compass size={16} className="text-primary" />
+                    Definição Atual de Escopo
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => setShowPivotForm(!showPivotForm)}
+                  >
+                    <GitFork size={13} />
+                    {showPivotForm ? 'Fechar Formulário' : '+ Registrar Mudança de Rota'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {idea.scope || 'Nenhum escopo delimitado ainda. Defina os limites abaixo.'}
+                </p>
+              </div>
+
+              {/* Formulário de Mudança de Rota */}
+              {showPivotForm && (
+                <div className="p-4 rounded-lg border border-primary/40 bg-primary/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-primary flex items-center gap-1.5">
+                      <Sparkles size={14} />
+                      Novo Registro de Mudança de Rota / Pivô
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="text-xs text-muted-foreground">
+                      Tipo de Mudança
+                      <select
+                        className="mt-1"
+                        value={pivotType}
+                        onChange={e => setPivotType(e.target.value as PivotRecord['type'])}
+                      >
+                        <option value="Redução de Escopo">Redução de Escopo (Simplificar para entregar rápido)</option>
+                        <option value="Expansão de Escopo">Expansão de Escopo (Novas ambições e escala)</option>
+                        <option value="Mudança de Rota">Mudança de Rota (Pivô de público, canal ou produto)</option>
+                        <option value="Pausa Estratégica">Pausa Estratégica (Congelar temporariamente)</option>
+                      </select>
+                    </label>
+
+                    <label className="text-xs text-muted-foreground">
+                      Novo Escopo do Projeto
+                      <input
+                        className="text-field mt-1 text-xs"
+                        placeholder="Ex.: Focar apenas na versão web inicial..."
+                        value={newScope}
+                        onChange={e => setNewScope(e.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  <label className="text-xs text-muted-foreground block">
+                    Motivo da Mudança (Por que decidimos mudar de rumo?) *
+                    <textarea
+                      className="text-field mt-1 text-xs resize-none"
+                      rows={2}
+                      placeholder="Ex: Percebemos que 80% do valor estava na funcionalidade de busca e o restante estava gerando atrito..."
+                      value={pivotReason}
+                      onChange={e => setPivotReason(e.target.value)}
+                    />
+                  </label>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setShowPivotForm(false)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 primary-action"
+                      onClick={handleSavePivot}
+                      disabled={!pivotReason.trim()}
+                    >
+                      <Check size={14} />
+                      Salvar Mudança de Rota
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Histórico de Mudanças de Rota */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                  <History size={13} />
+                  Histórico de Pivôs e Ajustes de Escopo ({idea.pivots?.length ?? 0})
+                </h4>
+
+                {(!idea.pivots || idea.pivots.length === 0) && (
+                  <p className="text-xs text-muted-foreground py-4 text-center border border-dashed rounded-lg">
+                    Nenhuma mudança de rota registrada ainda. Se precisar adaptar o projeto, registre aqui para manter
+                    a clareza do porquê o rumo mudou.
+                  </p>
+                )}
+
+                {idea.pivots?.map(pivot => (
+                  <div key={pivot.id} className="p-3.5 rounded-lg border border-border bg-card/70 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-primary px-2 py-0.5 rounded bg-primary/10 border border-primary/20">
+                        {pivot.type}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">{pivot.date}</span>
+                    </div>
+
+                    <div>
+                      <strong className="text-foreground block text-xs">Motivo:</strong>
+                      <p className="text-muted-foreground mt-0.5">{pivot.reason}</p>
+                    </div>
+
+                    <div className="pt-2 border-t border-border/50 text-[11px] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-muted-foreground">Escopo Anterior:</span>
+                        <p className="text-foreground/80 line-clamp-2">{pivot.previousScope}</p>
+                      </div>
+                      <div>
+                        <span className="text-primary font-medium">Novo Escopo:</span>
+                        <p className="text-foreground line-clamp-2">{pivot.newScope}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ABA 4: DIÁRIO DE BORDO & NOTAS */}
+          {tab === 'notes' && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-semibold text-sm">Diário de Bordo & Insights</h3>
+                <p className="text-xs text-muted-foreground">
+                  Registre aprendizados, conversas, links de referência e anotações do dia a dia.
+                </p>
+              </div>
+
+              {/* Criar Nova Nota */}
+              <div className="p-3 rounded-lg border border-border bg-card">
+                <textarea
+                  className="w-full bg-transparent border-0 resize-none text-xs text-foreground placeholder:text-muted-foreground outline-none"
+                  rows={3}
+                  placeholder="Escreva um aprendizado, link ou nota rápida..."
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                />
+                <div className="flex justify-end mt-2 pt-2 border-t border-border/50">
+                  <Button size="sm" className="h-7 text-xs gap-1" onClick={handleAddNote} disabled={!noteText.trim()}>
+                    <Plus size={13} />
+                    Adicionar Nota
+                  </Button>
+                </div>
+              </div>
+
+              {/* Lista de Notas */}
+              <div className="space-y-2.5">
+                {(!idea.notes || idea.notes.length === 0) && (
+                  <p className="text-xs text-muted-foreground py-4 text-center border border-dashed rounded-lg">
+                    Nenhuma anotação registrada ainda.
+                  </p>
+                )}
+
+                {idea.notes?.map(note => (
+                  <div key={note.id} className="p-3 rounded-lg border border-border/70 bg-card/60 text-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] text-muted-foreground">{note.createdAt}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteNote(note.id)}
+                      >
+                        <Trash2 size={12} />
+                      </Button>
+                    </div>
+                    <p className="text-foreground leading-relaxed whitespace-pre-wrap">{note.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ABA 5: CALENDÁRIO & AGENDA */}
+          {tab === 'calendar' && (
+            <div className="space-y-5">
+              <div className="p-4 rounded-lg bg-card border border-border space-y-4">
+                <div>
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    <CalendarDays size={16} className="text-primary" />
+                    Agendamento e Prazos
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Conecte esta ideia ao seu calendário pessoal para garantir espaço na sua rotina.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="text-xs text-muted-foreground">
+                    Data Planejada de Execução
+                    <input
+                      type="date"
+                      className="text-field mt-1 text-xs"
+                      value={idea.day ?? ''}
+                      onChange={e => updateIdea(idea.id, { day: e.target.value || undefined })}
+                    />
+                  </label>
+
+                  <label className="text-xs text-muted-foreground">
+                    Bloco do Dia
+                    <select
+                      className="mt-1"
+                      value={idea.block ?? 'Manhã'}
+                      onChange={e => updateIdea(idea.id, { block: e.target.value as DayBlock })}
+                    >
+                      <option value="Manhã">Manhã</option>
+                      <option value="Tarde">Tarde</option>
+                      <option value="Noite">Noite</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label className="text-xs text-muted-foreground block">
+                  Prazo Limite / Meta de Conclusão (Opcional)
+                  <input
+                    type="date"
+                    className="text-field mt-1 text-xs"
+                    value={idea.targetDate ?? ''}
+                    onChange={e => updateIdea(idea.id, { targetDate: e.target.value || undefined })}
+                  />
+                </label>
+              </div>
+
+              {/* Botões de Integração com Google Agenda e ICS */}
+              <div className="p-4 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
+                <span className="text-xs font-semibold text-primary block">
+                  Sincronizar com seu Calendário Externo
+                </span>
+                <p className="text-xs text-muted-foreground">
+                  Crie um evento na sua agenda com os passos e o resumo desta ideia já preenchidos.
+                </p>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                    onClick={() => {
+                      const url = createGoogleCalendarUrl(idea);
+                      window.open(url, '_blank');
+                    }}
+                  >
+                    <ExternalLink size={13} />
+                    Abrir no Google Agenda
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1.5"
+                    onClick={() => {
+                      downloadIcsFile(idea);
+                      toast.success('Arquivo .ics gerado com sucesso!');
+                    }}
+                  >
+                    <Download size={13} />
+                    Baixar arquivo de agenda (.ics)
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ABA 6: IA COACH & DESBLOQUEIO */}
+          {tab === 'coach' && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg border border-primary/30 bg-card space-y-3">
+                <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+                  <Lightbulb size={16} />
+                  Diagnóstico de Fricção Mental
+                </div>
+                <p className="text-xs text-foreground leading-relaxed">{coaching.frictionDiagnosis}</p>
+              </div>
+
+              <div className="p-4 rounded-lg border border-amber/30 bg-amber/5 space-y-2">
+                <div className="flex items-center gap-2 text-amber font-semibold text-xs">
+                  <Sparkles size={15} />
+                  Próxima Ação de Alto Impacto
+                </div>
+                <p className="text-xs text-foreground leading-relaxed">{coaching.recommendedAction}</p>
+              </div>
+
+              <div className="p-4 rounded-lg border border-violet/30 bg-violet/5 space-y-2">
+                <div className="flex items-center gap-2 text-violet font-semibold text-xs">
+                  <AlertCircle size={15} />
+                  Pergunta Provocativa para Clareza
+                </div>
+                <p className="text-xs text-foreground font-medium italic">"{coaching.coachingQuestion}"</p>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  className="w-full primary-action gap-2"
+                  onClick={() => {
+                    onClose();
+                    window.dispatchEvent(new CustomEvent('ideaflow:mentor', { detail: { idea } }));
+                  }}
+                >
+                  <Sparkles size={16} />
+                  Conversar com o Mentor IA sobre esta ideia (100% Gratuito)
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+}
