@@ -339,6 +339,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="topbar">
         <div className="topbar-inner">
           <div className="flex items-center gap-3">
+            {/* Botão rápido para expandir menu lateral no Desktop quando estiver recolhido */}
+            {sidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="hidden md:flex items-center justify-center p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer mr-1"
+                title="Expandir menu lateral"
+                aria-label="Expandir menu lateral"
+              >
+                <PanelLeftOpen size={18} />
+              </button>
+            )}
+
             {/* Logo visível no Mobile */}
             <Link to="/" className="wordmark md:hidden active:scale-95 transition-transform" aria-label="Ideaflow início">
               <span className="brand-icon">

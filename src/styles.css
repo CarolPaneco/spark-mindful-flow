@@ -215,6 +215,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     width: calc(100% - var(--sidebar-width, 260px));
     transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1), width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
+  .topbar-inner {
+    padding: 0 28px;
+  }
+  .main-content {
+    padding: 24px 28px 0;
+  }
   .bottom-nav {
     display: none !important;
   }

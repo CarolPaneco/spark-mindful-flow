@@ -219,7 +219,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
   };
 
   const content = (
-    <div className="sheet-body max-w-3xl mx-auto w-full p-2 sm:p-4">
+    <div className="sheet-body max-w-4xl mx-auto w-full p-2 sm:p-4">
       <div className="sheet-eyebrow">
         <Sparkles size={15} />
         TODA REALIZAÇÃO COMEÇA AQUI
@@ -613,7 +613,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
           if (!v) onClose();
         }}
       >
-        <DialogContent className="max-w-3xl w-[90vw] max-h-[88vh] overflow-y-auto p-6 sm:p-8 rounded-3xl border border-border bg-card/95 backdrop-blur-2xl shadow-2xl">
+        <DialogContent className="max-w-5xl w-[94vw] max-h-[92vh] overflow-y-auto p-6 sm:p-10 rounded-3xl border border-border bg-card/95 backdrop-blur-2xl shadow-2xl">
           <DialogTitle className="sr-only">
             {draft ? 'Personalize o plano da sua ideia.' : 'O que está na sua cabeça?'}
           </DialogTitle>

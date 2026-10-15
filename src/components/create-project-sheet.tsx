@@ -19,6 +19,12 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from '@/components/ui/drawer';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
 import {
@@ -56,6 +62,18 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
   const [targetDate, setTargetDate] = useState('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Detecção de Desktop (>= 769px) para abrir modal imersivo e amplo no Web
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth >= 769;
+  });
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 769);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const hasGeminiKey = Boolean(getActiveGeminiKey());
 
@@ -303,27 +321,22 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
     0
   );
 
-  return (
-    <Drawer
-      open={open}
-      onOpenChange={isOpen => {
-        if (!isOpen) onClose();
-      }}
-    >
-      <DrawerContent className="max-h-[94vh]">
-        <div className="sheet-body max-w-3xl mx-auto w-full">
-          {/* Eyebrow & Título */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="sheet-eyebrow text-violet">
-              <FolderPlus size={15} />
-              NOVO PROJETO MACRO · ESTRUTURA ORGANIZADA
-            </div>
-            <span className="text-xs bg-violet/15 text-violet border border-violet/30 px-2 py-0.5 rounded font-medium">
-              Multi-Ideias
-            </span>
-          </div>
+  const content = (
+    <div className="sheet-body max-w-4xl mx-auto w-full p-2 sm:p-4">
+      {/* Eyebrow & Título */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="sheet-eyebrow text-violet">
+          <FolderPlus size={15} />
+          NOVO PROJETO MACRO · ESTRUTURA ORGANIZADA
+        </div>
+        <span className="text-xs bg-violet/15 text-violet border border-violet/30 px-2 py-0.5 rounded font-medium">
+          Multi-Ideias
+        </span>
+      </div>
 
-          <DrawerTitle className="sheet-title mt-2">Criar Novo Projeto</DrawerTitle>
+      <h2 className="sheet-title text-2xl sm:text-3xl font-display font-bold text-foreground mt-2">
+        Criar Novo Projeto
+      </h2>
           <div className="flex flex-wrap items-center justify-between gap-2 mt-1">
             <DrawerDescription className="text-sm text-muted-foreground leading-relaxed flex-1">
               Projetos permitem organizar um escopo maior contendo várias ideias ou módulos dentro (ex:
@@ -598,7 +611,43 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
               </Button>
             </div>
           </div>
-        </div>
+    </div>
+  );
+
+  // No Desktop / Web: Modal centralizado amplo cobrindo quase toda a tela
+  if (isDesktop) {
+    return (
+      <Dialog
+        open={open}
+        onOpenChange={isOpen => {
+          if (!isOpen) onClose();
+        }}
+      >
+        <DialogContent className="max-w-5xl w-[94vw] max-h-[92vh] overflow-y-auto p-6 sm:p-10 rounded-3xl border border-border bg-card/95 backdrop-blur-2xl shadow-2xl">
+          <DialogTitle className="sr-only">Criar Novo Projeto</DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulário para estruturação e criação de projeto macro com múltiplas ideias.
+          </DialogDescription>
+          {content}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // No Mobile: Gaveta inferior fluida (Drawer)
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={isOpen => {
+        if (!isOpen) onClose();
+      }}
+    >
+      <DrawerContent className="max-h-[94vh]">
+        <DrawerTitle className="sr-only">Criar Novo Projeto</DrawerTitle>
+        <DrawerDescription className="sr-only">
+          Formulário para estruturação e criação de projeto macro com múltiplas ideias.
+        </DrawerDescription>
+        {content}
       </DrawerContent>
     </Drawer>
   );
