@@ -21,6 +21,7 @@ export interface AuthProfile {
   username?: string | undefined;
   role?: string | undefined;
   avatar_url?: string | undefined;
+  sectors?: any[] | undefined;
 }
 
 /**

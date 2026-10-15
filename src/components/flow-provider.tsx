@@ -123,13 +123,6 @@ export function FlowProvider({ children }: { children: ReactNode }) {
           ...prev,
           ideas: cloudIdeas,
         }));
-      } else {
-        // Se a nuvem estiver vazia, o usuário é novo e suas ideias e setores começam 100% zerados
-        setData(prev => ({
-          ...prev,
-          ideas: [],
-          sectors: [],
-        }));
       }
     } catch (err) {
       console.warn('Erro ao sincronizar na inicialização do usuário:', err);
