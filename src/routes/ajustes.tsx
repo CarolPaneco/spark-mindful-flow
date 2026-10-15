@@ -15,6 +15,7 @@ import {
   ServerOff,
   HelpCircle,
   Compass,
+  Trash2,
 } from 'lucide-react';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { toast } from 'sonner';
@@ -275,6 +276,31 @@ function Settings() {
           <Button variant="outline" onClick={() => input.current?.click()}>
             <Upload />
             Restaurar de arquivo
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (
+                window.confirm(
+                  'ATENÇÃO: Deseja limpar todo o cache local e recomeçar do zero absoluto?\n\nIsso apagará o histórico salvo no navegador e reiniciará a sessão limpa.'
+                )
+              ) {
+                try {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  toast.success('Cache e dados locais apagados com sucesso!');
+                  setTimeout(() => {
+                    window.location.href = '/';
+                  }, 500);
+                } catch {
+                  window.location.reload();
+                }
+              }
+            }}
+            className="text-pink hover:text-pink hover:bg-pink/10 border-pink/30 hover:border-pink/50 cursor-pointer"
+          >
+            <Trash2 size={15} />
+            Limpar Cache Local e Resetar
           </Button>
           <input
             ref={input}
