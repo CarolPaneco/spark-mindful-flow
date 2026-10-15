@@ -508,30 +508,181 @@ export function generateAiSteps(
     ];
   }
 
-  if (/bolo|receita|cenoura|cozinha|almoço|jantar|comida|avó|avô|visita|família|aniversário/.test(lower)) {
+  // Culinária, Confeitaria, Família
+  if (/bolo|receita|cenoura|cozinha|almoço|jantar|comida|avó|avô|visita|família|aniversário|sobremesa|pão/.test(lower)) {
     return [
       {
         id: crypto.randomUUID(),
-        text: 'Conferir os ingredientes na despensa e listar o que falta',
+        text: 'Conferir os ingredientes na despensa e anotar o que falta comprar',
         minutes: 15,
         done: false,
       },
       {
         id: crypto.randomUUID(),
-        text: 'Comprar os ingredientes frescos necessários no mercado',
+        text: 'Ir ao mercado e adquirir os itens frescos e a embalagem',
         minutes: 25,
         done: false,
       },
       {
         id: crypto.randomUUID(),
-        text: 'Preparar a receita com carinho e deixar assar no forno',
+        text: 'Executar o preparo e acompanhar o tempo de forno com atenção',
         minutes: 45,
         done: false,
       },
       {
         id: crypto.randomUUID(),
-        text: 'Embalar com cuidado e fazer a visita especial para compartilhar',
+        text: 'Finalizar a montagem/decoração e servir ou entregar com carinho',
+        minutes: 20,
+        done: false,
+      },
+    ];
+  }
+
+  // Livros, Leitura, Escrita
+  if (/livro|leitura|ler|escrever|capítulo|ebook|artigo|texto|redigir/.test(lower)) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        text: `Definir o tema central e sumário básico de “${title.slice(0, 35)}”`,
+        minutes: 15,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Escrever o primeiro rascunho de 500 palavras sem se preocupar em editar',
         minutes: 30,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Revisar a coerência, clareza e ritmo das ideias expressas',
+        minutes: 25,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Compartilhar o texto inicial com 1 leitor de confiança para feedback',
+        minutes: 15,
+        done: false,
+      },
+    ];
+  }
+
+  // Saúde, Exercício, Corrida, Hábitos
+  if (/correr|corrida|treino|academia|exercício|saúde|peso|dieta|hábito|meditar|alongar/.test(lower)) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        text: 'Separar tênis, roupas apropriadas e garrafa de água com antecedência',
+        minutes: 10,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Executar a primeira sessão no ritmo confortável (sem exageros)',
+        minutes: 30,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Fazer alongamento leve e registrar as sensações físicas e mentais',
+        minutes: 15,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Agendar no calendário os próximos 3 dias fixos da semana para repetir',
+        minutes: 10,
+        done: false,
+      },
+    ];
+  }
+
+  // Finanças, Economia, Investimentos
+  if (/dinheiro|finança|economizar|investir|gasto|orçamento|dívida|reserva/.test(lower)) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        text: 'Abrir o extrato bancário dos últimos 30 dias e listar os custos fixos',
+        minutes: 20,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Identificar 2 ou 3 despesas que podem ser canceladas ou renegociadas',
+        minutes: 20,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Definir o valor da meta mensal a ser poupado logo no dia do pagamento',
+        minutes: 15,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Automatizar a transferência para a reserva de emergência',
+        minutes: 15,
+        done: false,
+      },
+    ];
+  }
+
+  // Viagem, Passeio, Férias
+  if (/viagem|viajar|férias|passeio|hotel|passagem|roteiro|mala/.test(lower)) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        text: `Definir as datas ideais e o orçamento total estimado para ${title.slice(0, 30)}`,
+        minutes: 15,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Pesquisar 3 opções de hospedagem bem avaliadas e transporte',
+        minutes: 30,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Montar a lista de atrações imperdíveis divididas por dia',
+        minutes: 25,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Confirmar as reservas principais e preparar o checklist de bagagem',
+        minutes: 20,
+        done: false,
+      },
+    ];
+  }
+
+  // Estudos, Cursos, Certificação
+  if (/estudar|curso|aprender|certificação|faculdade|idioma|inglês|prova/.test(lower)) {
+    return [
+      {
+        id: crypto.randomUUID(),
+        text: `Mapear o conteúdo programático e escolher o material didático guia`,
+        minutes: 15,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Criar um bloco protegido de 25 minutos no cronômetro para o módulo 1',
+        minutes: 25,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Fazer anotações manuscritas ou mapa mental dos pontos mais difíceis',
+        minutes: 20,
+        done: false,
+      },
+      {
+        id: crypto.randomUUID(),
+        text: 'Praticar com 3 exercícios reais para fixar o aprendizado na memória',
+        minutes: 20,
         done: false,
       },
     ];
@@ -540,25 +691,25 @@ export function generateAiSteps(
   return [
     {
       id: crypto.randomUUID(),
-      text: `Escrever o objetivo de “${title.slice(0, 45)}” em uma frase`,
+      text: `Escrever a meta objetiva de “${title.slice(0, 40)}” e o resultado final esperado`,
       minutes: 15,
       done: false,
     },
     {
       id: crypto.randomUUID(),
-      text: 'Reunir 3 referências práticas e listar os recursos necessários',
+      text: `Mapear os recursos, materiais e primeiros passos necessários para ${title.slice(0, 30)}`,
       minutes: 20,
       done: false,
     },
     {
       id: crypto.randomUUID(),
-      text: 'Criar uma primeira versão simples do resultado',
-      minutes: 25,
+      text: `Construir a primeira versão funcional e colocar o plano em prática`,
+      minutes: 35,
       done: false,
     },
     {
       id: crypto.randomUUID(),
-      text: 'Revisar o resultado e definir o próximo compromisso de evolução',
+      text: 'Revisar o que foi concluído e definir o próximo avanço no funil',
       minutes: 15,
       done: false,
     },

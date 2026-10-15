@@ -929,8 +929,51 @@ ${contextText ? `Contexto atual do usuário no aplicativo: ${contextText}` : ''}
 export async function planIdeaWithAi(
   rawText: string,
   sectors: Sector[]
-): Promise<{ idea: Idea; provider: 'groq' | 'gemini' | 'local'; error?: string }> {
-  // 1. Prioriza Groq
+): Promise<{ idea: Idea; provider: 'chatgpt' | 'groq' | 'gemini' | 'local'; error?: string }> {
+  // 1. Prioriza IA Integrada Oficial (OpenAI GPT-4o-mini sem precisar de chave)
+  try {
+    const { planIdeaWithIntegratedAi } = await import('./integrated-ai');
+    const sectorsList = sectors.map(s => `"${s.id}" (${s.name})`).join(', ');
+    const parsed = await planIdeaWithIntegratedAi(rawText, sectorsList);
+    if (parsed && parsed.title && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+      const matchedSector =
+        sectors.find(s => s.id === parsed.sectorId) ??
+        sectors.find(s => s.id === 'personal') ??
+        sectors[0] ?? { id: 'personal', name: 'Pessoal', tone: 'pink' as const };
+
+      const steps: Step[] = parsed.steps.map((s: any, idx: number) => ({
+        id: crypto.randomUUID(),
+        text: s.text || `Passo ${idx + 1}`,
+        minutes: Number(s.minutes) || 20,
+        done: false,
+      }));
+
+      const totalMinutes = steps.reduce((acc, curr) => acc + curr.minutes, 0);
+
+      const idea: Idea = {
+        id: crypto.randomUUID(),
+        title: parsed.title || rawText.slice(0, 50),
+        summary: parsed.summary || rawText,
+        sector: matchedSector.id,
+        stage: 0,
+        minutes: totalMinutes,
+        dedicated: 0,
+        priority: ['Urgente', 'Importante', 'Normal'].includes(parsed.priority) ? parsed.priority : 'Importante',
+        scope: parsed.scope || `Execução da ideia "${parsed.title}".`,
+        immediate: parsed.immediate || steps[0]?.text || 'Definir o primeiro resultado em uma frase.',
+        clarity: parsed.clarity || 'Um passo pequeno e concreto vale mais que um plano perfeito.',
+        steps,
+        pivots: [],
+        notes: [],
+      };
+
+      return { idea, provider: 'chatgpt' };
+    }
+  } catch (err: any) {
+    console.warn('IA Integrada em nuvem indisponível para planejamento, tentando Groq/Gemini:', err?.message);
+  }
+
+  // 2. Groq (se chave configurada)
   if (isGroqActive()) {
     try {
       const groqResult = await planIdeaWithGroq(rawText, sectors);
@@ -942,7 +985,7 @@ export async function planIdeaWithAi(
     }
   }
 
-  // 2. Tenta Gemini
+  // 3. Google Gemini (se chave configurada)
   if (getActiveGeminiKey()) {
     try {
       const geminiResult = await planIdeaWithGemini(rawText, sectors);
@@ -954,7 +997,7 @@ export async function planIdeaWithAi(
     }
   }
 
-  // 3. Motor Local Seguro
+  // 4. Motor Cognitivo Heurístico Local Especialista
   const fallback = planIdea(rawText, sectors);
   return { idea: fallback, provider: 'local' };
 }
