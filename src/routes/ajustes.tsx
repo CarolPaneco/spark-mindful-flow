@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useRef, useState, useEffect } from 'react';
+import { useRef } from 'react';
 import {
   Check,
   Download,
@@ -9,9 +9,6 @@ import {
   Upload,
   ShieldCheck,
   Sparkles,
-  Key,
-  ExternalLink,
-  Bot,
   Smartphone,
   HardDrive,
   Lock,
@@ -24,28 +21,16 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
 import { isFlowData, localDate, palettes } from '@/lib/ideaflow';
-import {
-  getStoredGeminiKey,
-  setStoredGeminiKey,
-  testGeminiApiKey,
-  cleanGeminiKey,
-} from '@/lib/ai-assistant';
-import {
-  getActiveGroqKey,
-  setStoredGroqKey,
-  cleanGroqKey,
-  testGroqApiKey,
-} from '@/lib/groq';
 
 export const Route = createFileRoute('/ajustes')({
   head: () => ({
     meta: [
-      { title: 'Ajustes, Backup & IA · Ideaflow' },
+      { title: 'Ajustes & Backup · Ideaflow' },
       {
         name: 'description',
-        content: 'Personalize as cores do seu espaço, configure a IA gratuita e proteja suas ideias.',
+        content: 'Personalize as cores do seu espaço, sincronização e proteja suas ideias com backup.',
       },
-      { property: 'og:title', content: 'Ajustes, Backup & IA · Ideaflow' },
+      { property: 'og:title', content: 'Ajustes & Backup · Ideaflow' },
       {
         property: 'og:description',
         content: 'Seu espaço do seu jeito. Suas ideias sempre com você.',
@@ -60,90 +45,6 @@ export const Route = createFileRoute('/ajustes')({
 function Settings() {
   const { data, setData } = useFlow();
   const input = useRef<HTMLInputElement>(null);
-  
-  // Groq AI
-  const [groqKeyInput, setGroqKeyInput] = useState('');
-  const [hasGroqKey, setHasGroqKey] = useState(false);
-  const [testingGroqKey, setTestingGroqKey] = useState(false);
-  const [groqKeyError, setGroqKeyError] = useState<string | null>(null);
-
-  // Gemini AI (Secundário)
-  const [geminiKeyInput, setGeminiKeyInput] = useState('');
-  const [hasKey, setHasKey] = useState(false);
-  const [testingKey, setTestingKey] = useState(false);
-  const [keyError, setKeyError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const existingGroq = getActiveGroqKey();
-    setGroqKeyInput(existingGroq);
-    setHasGroqKey(Boolean(existingGroq));
-
-    const existing = getStoredGeminiKey();
-    setGeminiKeyInput(existing);
-    setHasKey(Boolean(existing));
-  }, []);
-
-  const handleSaveGroqKey = async () => {
-    const clean = cleanGroqKey(groqKeyInput);
-    if (!clean) {
-      setStoredGroqKey('');
-      setHasGroqKey(false);
-      setGroqKeyError(null);
-      toast.info('Chave Groq removida.');
-      return;
-    }
-
-    setTestingGroqKey(true);
-    setGroqKeyError(null);
-    try {
-      const res = await testGroqApiKey(clean);
-      if (res.success) {
-        setStoredGroqKey(clean);
-        setHasGroqKey(true);
-        setGroqKeyError(null);
-        toast.success(`Chave Groq validada e ativada com sucesso! ⚡ LLaMA 3.3 disponível.`);
-      } else {
-        setGroqKeyError(res.error || 'A API da Groq recusou esta chave.');
-        toast.error(`Falha ao validar Groq: ${res.error}`);
-      }
-    } catch (e: any) {
-      setGroqKeyError(e?.message || 'Falha de conexão.');
-      toast.error(`Falha: ${e?.message}`);
-    } finally {
-      setTestingGroqKey(false);
-    }
-  };
-
-  const handleSaveGeminiKey = async () => {
-    const clean = cleanGeminiKey(geminiKeyInput);
-    if (!clean) {
-      setStoredGeminiKey('');
-      setHasKey(false);
-      setKeyError(null);
-      toast.info('Chave removida. O Mentor agora usará o Motor Cognitivo Local 100% gratuito.');
-      return;
-    }
-
-    setTestingKey(true);
-    setKeyError(null);
-    try {
-      const res = await testGeminiApiKey(clean);
-      if (res.success) {
-        setStoredGeminiKey(clean);
-        setHasKey(true);
-        setKeyError(null);
-        toast.success(`Chave do Google Gemini validada e salva! Modelo: ${res.model || 'Flash'}.`);
-      } else {
-        setKeyError(res.error || 'A Google recusou esta chave.');
-        toast.error(`Falha ao validar chave com a Google: ${res.error}`);
-      }
-    } catch (e: any) {
-      setKeyError(e?.message || 'Falha de conexão.');
-      toast.error(`Falha: ${e?.message}`);
-    } finally {
-      setTestingKey(false);
-    }
-  };
 
   const download = (format: 'json' | 'zip') => {
     const json = JSON.stringify(data, null, 2);
@@ -254,161 +155,7 @@ function Settings() {
         </div>
       </section>
 
-      {/* Seção de Inteligência Artificial Integrada */}
-      <section className="settings-section">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="flex items-center gap-2">
-              <Bot size={20} className="text-primary" />
-              Inteligência Artificial (Groq & LLaMA 3.3)
-            </h2>
-            <p>
-              O Ideaflow usa inteligência artificial rápida, aberta e gratuita para o Mentor IA e planejamento de ideias.
-            </p>
-          </div>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-green/10 text-green border border-green/20 font-medium shrink-0 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
-            {hasGroqKey ? 'Groq LLaMA 3.3 Ativo ⚡' : hasKey ? 'Gemini Flash Ativo' : 'IA Oficial Local Ativa'}
-          </span>
-        </div>
 
-        {/* Card Groq (Principal Recomendado) */}
-        <div className="mt-4 p-4 rounded-xl border border-primary/40 bg-card/70 space-y-3 text-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-foreground font-semibold">
-              <Zap size={14} className="text-primary" />
-              Groq Cloud API (Gratuita, Sem Bloqueios & Respostas em Milissegundos)
-            </div>
-            <span className="text-[11px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
-              Recomendada ⚡
-            </span>
-          </div>
-          <p className="text-muted-foreground leading-relaxed">
-            A Groq é 100% gratuita, livre de bloqueios corporativos de CORS e roda os modelos abertos mais avançados do mundo (LLaMA 3.3 70B Versatile).
-            Gere sua chave gratuita em 30 segundos no{' '}
-            <a
-              href="https://console.groq.com/keys"
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary underline inline-flex items-center gap-0.5 font-medium"
-            >
-              console.groq.com/keys
-              <ExternalLink size={10} />
-            </a>{' '}
-            e cole abaixo:
-          </p>
-
-          <div className="flex gap-2 pt-1">
-            <input
-              type="password"
-              className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-              placeholder="Cole sua chave Groq gratuita (gsk_...)"
-              value={groqKeyInput}
-              onChange={e => {
-                setGroqKeyInput(e.target.value);
-                if (groqKeyError) setGroqKeyError(null);
-              }}
-            />
-            <Button
-              size="sm"
-              className="h-8 text-xs primary-action gap-1"
-              disabled={testingGroqKey}
-              onClick={handleSaveGroqKey}
-            >
-              {testingGroqKey ? 'Validando...' : 'Salvar & Ativar'}
-            </Button>
-            {hasGroqKey && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs text-destructive hover:bg-destructive/10"
-                disabled={testingGroqKey}
-                onClick={() => {
-                  setGroqKeyInput('');
-                  setStoredGroqKey('');
-                  setHasGroqKey(false);
-                  setGroqKeyError(null);
-                  toast.info('Chave Groq removida.');
-                }}
-              >
-                Remover
-              </Button>
-            )}
-          </div>
-
-          {groqKeyError && (
-            <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs leading-relaxed mt-2">
-              <strong>Atenção:</strong> A Groq retornou um erro: <br />
-              <span className="font-mono text-[11px]">{groqKeyError}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Card Google Gemini (Secundário) */}
-        <div className="mt-3 p-4 rounded-xl border border-border bg-card/50 space-y-3 text-xs">
-          <div className="flex items-center gap-2 text-foreground font-semibold">
-            <Key size={14} className="text-muted-foreground" />
-            Google Gemini Flash (Opcional Alternativo)
-          </div>
-          <p className="text-muted-foreground leading-relaxed">
-            Se preferir usar o Gemini Flash, você também pode conectar sua chave gerada no{' '}
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary underline inline-flex items-center gap-0.5"
-            >
-              Google AI Studio
-              <ExternalLink size={10} />
-            </a>.
-          </p>
-
-          <div className="flex gap-2 pt-1">
-            <input
-              type="password"
-              className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-              placeholder="Cole sua chave gratuita aqui (AIzaSy...)"
-              value={geminiKeyInput}
-              onChange={e => {
-                setGeminiKeyInput(e.target.value);
-                if (keyError) setKeyError(null);
-              }}
-            />
-            <Button
-              size="sm"
-              className="h-8 text-xs primary-action gap-1"
-              disabled={testingKey}
-              onClick={handleSaveGeminiKey}
-            >
-              {testingKey ? 'Validando...' : 'Salvar & Validar'}
-            </Button>
-            {hasKey && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs text-destructive hover:bg-destructive/10"
-                disabled={testingKey}
-                onClick={() => {
-                  setGeminiKeyInput('');
-                  setStoredGeminiKey('');
-                  setHasKey(false);
-                  setKeyError(null);
-                  toast.info('Chave removida. Usando motor gratuito.');
-                }}
-              >
-                Remover
-              </Button>
-            )}
-          </div>
-
-          {keyError && (
-            <div className="p-2.5 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs leading-relaxed mt-2">
-              <strong>Atenção:</strong> A Google retornou um erro: <br />
-              <span className="font-mono text-[11px]">{keyError}</span>
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Nuvem Supabase & Tutorial do Aplicativo */}
       <section className="settings-section">

@@ -58,7 +58,7 @@ export interface Idea {
 export interface UserProfile {
   name: string;
   role: string;
-  bio?: string;
+  bio?: string | undefined;
   streak: number;
 }
 
@@ -67,7 +67,7 @@ export interface FlowData {
   sectors: Sector[];
   theme: 'dark' | 'light';
   palette: string;
-  profile?: UserProfile;
+  profile?: UserProfile | undefined;
 }
 
 export const stageNames = ['Faísca', 'Estrutura', 'Em Fluxo', 'Ajustes', 'Realidade'];
@@ -78,7 +78,6 @@ export const initialSectors: Sector[] = [
   { id: 'tech', name: 'Tecnologia', tone: 'cyan' },
   { id: 'business', name: 'Negócios', tone: 'violet' },
   { id: 'personal', name: 'Vida pessoal', tone: 'pink' },
-  { id: 'wood', name: 'Marcenaria', tone: 'amber' },
 ];
 
 const makeIdea = (
@@ -221,7 +220,7 @@ export const seedData = (withDemos = false): FlowData => {
       'demo-6',
       'Minha primeira coleção de móveis',
       'Design autoral em madeira maciça, feito com as próprias mãos.',
-      'wood',
+      'personal',
       2,
       180,
       2,
@@ -298,7 +297,7 @@ export const seedData = (withDemos = false): FlowData => {
   ];
 
   return {
-    theme: 'dark',
+    theme: 'light',
     palette: 'Aurora',
     profile: {
       name: 'Explorador Ideaflow',
@@ -306,7 +305,7 @@ export const seedData = (withDemos = false): FlowData => {
       bio: 'Transformando ideias em realidade, um passo consciente de cada vez.',
       streak: 6,
     },
-    sectors: initialSectors.map(s => ({ ...s })),
+    sectors: withDemos ? initialSectors.map(s => ({ ...s })) : [],
     ideas: withDemos ? demoIdeas : [],
   };
 };
@@ -570,9 +569,8 @@ export function planIdea(text: string, sectors: Sector[]): Idea {
   const lower = text.toLocaleLowerCase('pt-BR');
   const rules: [RegExp, string][] = [
     [/app|site|software|código|tecnolog|digital|api|sistema/, 'tech'],
-    [/madeira|móvel|móveis|mesa|marcen|oficina/, 'wood'],
     [/vender|negócio|loja|newsletter|cliente|empresa|monetizar/, 'business'],
-    [/rotina|saúde|correr|pessoal|viagem|exercício|hábito|bolo|receita|cozinha|avó|avô|família/, 'personal'],
+    [/rotina|saúde|correr|pessoal|viagem|exercício|hábito|bolo|receita|cozinha|madeira|móvel|marcen|oficina/, 'personal'],
   ];
   const suggested = rules.find(([re]) => re.test(lower))?.[1];
   const sector = sectors.find(s => s.id === suggested) ?? sectors[0];
@@ -801,7 +799,7 @@ export function calculateGlobalSectorComparison(sectors: Sector[], ideas: Idea[]
     return delayB - delayA;
   });
 
-  const mostDelayed = sortedByDelay[0] && sortedByDelay[0].id !== mostDeveloped?.sector.id ? sortedByDelay[0] : (sortedByDelay[1] ?? sortedByDelay[0] ?? null);
+  const mostDelayed = sortedByDelay[0] && sortedByDelay[0].sector.id !== mostDeveloped?.sector.id ? sortedByDelay[0] : (sortedByDelay[1] ?? sortedByDelay[0] ?? null);
 
   const chartData = sectorMetrics.map(m => ({
     name: m.sector.name,
@@ -826,7 +824,6 @@ export function isFlowData(input: unknown): input is FlowData {
     (data.theme === 'dark' || data.theme === 'light') &&
     typeof data.palette === 'string' &&
     Array.isArray(data.sectors) &&
-    data.sectors.length > 0 &&
     data.sectors.every(
       s => typeof s.id === 'string' && typeof s.name === 'string' && ['cyan', 'pink', 'amber', 'green', 'violet'].includes(s.tone)
     ) &&

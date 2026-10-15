@@ -88,4 +88,90 @@ describe('Ideaflow offline engine', () => {
     const active = data.ideas.filter(i => !i.archived);
     expect(active.every(i => !i.archived)).toBe(true);
   });
+
+  it('provides ready-to-use sector templates with starter ideas', async () => {
+    const { READY_SECTOR_TEMPLATES, buildStarterIdeasForSector } = await import('@/lib/sector-templates');
+    expect(READY_SECTOR_TEMPLATES.length).toBeGreaterThanOrEqual(5);
+
+    const techTemplate = READY_SECTOR_TEMPLATES.find(t => t.id === 'tecnologia');
+    expect(techTemplate).toBeDefined();
+    expect(techTemplate?.starterIdeas.length).toBeGreaterThanOrEqual(3);
+
+    const ideas = buildStarterIdeasForSector('custom-tech-id', techTemplate!);
+    expect(ideas.length).toBe(techTemplate!.starterIdeas.length);
+    expect(ideas[0]?.sector).toBe('custom-tech-id');
+    expect(ideas[0]?.steps.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('generates a deep funnel dossier and understands user funnel questions', async () => {
+    const { generateFunnelDossier, askMentorAi } = await import('@/lib/ai-assistant');
+    const data = seedData(true);
+    const dossier = generateFunnelDossier(data.ideas, data.sectors);
+
+    expect(dossier).toContain('ESTUDO DO FUNIL EM TEMPO REAL');
+    expect(dossier).toContain('Faísca');
+    expect(dossier).toContain('Em Fluxo');
+
+    // Testa se o Mentor IA analisa o funil e cita as ideias reais
+    const funnelAnswer = await askMentorAi({
+      message: 'Como estão meus funis atualmente?',
+      allIdeas: data.ideas,
+      sectors: data.sectors,
+    });
+    expect(funnelAnswer.reply).toContain('Diagnóstico');
+    expect(funnelAnswer.reply.length).toBeGreaterThan(100);
+
+    // Testa se o Mentor IA identifica uma ideia específica pelo título
+    const ideaSpecificAnswer = await askMentorAi({
+      message: 'Qual o próximo passo para o app de livros?',
+      allIdeas: data.ideas,
+      sectors: data.sectors,
+    });
+    expect(ideaSpecificAnswer.reply.toLowerCase()).toContain('livros');
+  });
+
+  it('handles mental health and vulnerability with deep empathy and zero robotic process', async () => {
+    const { askMentorAi } = await import('@/lib/ai-assistant');
+    const answer = await askMentorAi({
+      message: 'estou com depressao e nao consigo fazer nada',
+    });
+
+    // Deve acolher com afeto e JAMAIS responder com processos ou metas
+    expect(answer.reply).toContain('não precisa ser produtivo hoje');
+    expect(answer.reply).toContain('188');
+    expect(answer.reply).not.toContain('Clareza de Intenção');
+    expect(answer.reply).not.toContain('Micro-Passo de Validação');
+  });
+
+  it('responds naturally and conversationally to greetings and casual chat like a real chatbot', async () => {
+    const { askMentorAi } = await import('@/lib/ai-assistant');
+    
+    // Testa "oi tudo bem"
+    const greeting = await askMentorAi({ message: 'oi tudo bem' });
+    expect(greeting.reply).toContain('Tudo ótimo');
+    expect(greeting.reply).not.toContain('Clareza do Resultado Desejado');
+
+    // Testa "quem é você" e também com gíria "quem é vc"
+    const identity = await askMentorAi({ message: 'quem é você?' });
+    expect(identity.reply).toContain('Mentor Ideaflow');
+    expect(identity.reply).not.toContain('Clareza de Objetivo');
+
+    const identitySlang = await askMentorAi({ message: 'quem é vc' });
+    expect(identitySlang.reply).toContain('Mentor Ideaflow');
+    expect(identitySlang.reply).not.toContain('Entendi o que você trouxe');
+    expect(identitySlang.reply).not.toContain('ideia(s) em andamento no aplicativo');
+
+    // Testa piada
+    const joke = await askMentorAi({ message: 'conta uma piada' });
+    expect(joke.reply).toContain('programador');
+
+    // Testa o que é ideaflow
+    const about = await askMentorAi({ message: 'o que é o ideaflow?' });
+    expect(about.reply).toContain('Faísca');
+    expect(about.reply).toContain('Setores');
+
+    // Testa agradecimento
+    const gratitude = await askMentorAi({ message: 'muito obrigado!' });
+    expect(gratitude.reply).toContain('Por nada');
+  });
 });

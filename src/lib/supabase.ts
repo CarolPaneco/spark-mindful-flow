@@ -17,10 +17,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 export interface AuthProfile {
   id: string;
-  name?: string;
-  username?: string;
-  role?: string;
-  avatar_url?: string;
+  name?: string | undefined;
+  username?: string | undefined;
+  role?: string | undefined;
+  avatar_url?: string | undefined;
 }
 
 /**

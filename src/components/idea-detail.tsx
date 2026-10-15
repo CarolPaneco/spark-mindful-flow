@@ -27,6 +27,9 @@ import {
   Archive,
   ArchiveRestore,
   Layers,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -84,6 +87,7 @@ export function IdeaDetail({
   const [newStepText, setNewStepText] = useState('');
   const [newStepMinutes, setNewStepMinutes] = useState(15);
   const [editingStepIndex, setEditingStepIndex] = useState<number | null>(null);
+  const [draggedStepIdx, setDraggedStepIdx] = useState<number | null>(null);
 
   // Estados para Sub-ideias / Módulos de Projetos Complexos
   const [showSubIdeaForm, setShowSubIdeaForm] = useState(false);
@@ -166,6 +170,18 @@ export function IdeaDetail({
     const totalMinutes = updated.reduce((sum, s) => sum + s.minutes, 0);
     updateIdea(idea.id, { steps: updated, minutes: totalMinutes });
     toast.success('Passo removido.');
+  };
+
+  const handleMoveStep = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= idea.steps.length) return;
+    const reordered = [...idea.steps];
+    const [moved] = reordered.splice(fromIndex, 1);
+    if (!moved) return;
+    reordered.splice(toIndex, 0, moved);
+    updateIdea(idea.id, {
+      steps: reordered,
+      immediate: reordered[0]?.text ?? idea.immediate,
+    });
   };
 
   const handleSuggestStepsAi = () => {
@@ -854,10 +870,53 @@ export function IdeaDetail({
                 {idea.steps.map((step, index) => (
                   <div
                     key={step.id ?? index}
-                    className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-                      step.done ? 'bg-secondary/40 border-border/50 text-muted-foreground' : 'bg-card border-border'
+                    draggable
+                    onDragStart={() => setDraggedStepIdx(index)}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggedStepIdx !== null && draggedStepIdx !== index) {
+                        handleMoveStep(draggedStepIdx, index);
+                        setDraggedStepIdx(null);
+                      }
+                    }}
+                    className={`flex items-start gap-2.5 p-3 rounded-lg border transition-all ${
+                      draggedStepIdx === index
+                        ? 'opacity-50 border-primary border-dashed scale-[0.99]'
+                        : step.done
+                        ? 'bg-secondary/40 border-border/50 text-muted-foreground'
+                        : 'bg-card border-border hover:border-border-highlight'
                     }`}
                   >
+                    {/* Alça de Arraste e Controles Subir/Descer */}
+                    <div className="flex flex-col items-center gap-0.5 shrink-0 pt-0.5 select-none">
+                      <div
+                        className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground"
+                        title="Arraste para cima ou para baixo para reordenar"
+                      >
+                        <GripVertical size={13} />
+                      </div>
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          disabled={index === 0}
+                          onClick={() => handleMoveStep(index, index - 1)}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none p-0.5 rounded cursor-pointer"
+                          title="Mover passo para cima"
+                        >
+                          <ChevronUp size={11} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index === idea.steps.length - 1}
+                          onClick={() => handleMoveStep(index, index + 1)}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none p-0.5 rounded cursor-pointer"
+                          title="Mover passo para baixo"
+                        >
+                          <ChevronDown size={11} />
+                        </button>
+                      </div>
+                    </div>
+
                     <button
                       className="check-box cursor-pointer shrink-0 mt-0.5"
                       onClick={() => handleToggleStep(index)}

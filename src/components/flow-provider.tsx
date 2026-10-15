@@ -40,11 +40,13 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
         if (isFlowData(parsed)) {
-          // Remove completamente qualquer resquício de ideias mockadas (demo-*)
+          // Remove completamente qualquer resquício de ideias mockadas (demo-*) e setor de marcenaria antigo
           const cleanIdeas = (parsed.ideas || []).filter(i => !i.id.startsWith('demo-'));
+          const cleanSectors = (parsed.sectors || []).filter(s => s.id !== 'wood');
           setData({
             ...parsed,
             ideas: cleanIdeas,
+            sectors: cleanSectors,
           });
         }
       }
@@ -59,6 +61,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     document.documentElement.classList.toggle('light', data.theme === 'light');
+    document.documentElement.classList.toggle('dark', data.theme === 'dark');
     document.documentElement.dataset['palette'] = data.palette;
     try {
       localStorage.setItem('ideaflow-v1', JSON.stringify(data));
@@ -121,10 +124,11 @@ export function FlowProvider({ children }: { children: ReactNode }) {
           ideas: cloudIdeas,
         }));
       } else {
-        // Se a nuvem estiver vazia, o usuário é novo e suas ideias começam 100% zeradas
+        // Se a nuvem estiver vazia, o usuário é novo e suas ideias e setores começam 100% zerados
         setData(prev => ({
           ...prev,
           ideas: [],
+          sectors: [],
         }));
       }
     } catch (err) {
@@ -175,10 +179,11 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    // Zera as ideias e limpa cache para o próximo usuário
+    // Zera as ideias, setores e limpa cache para o próximo usuário
     setData(prev => ({
       ...prev,
       ideas: [],
+      sectors: [],
       profile: {
         name: 'Criador(a)',
         role: 'Criador(a)',

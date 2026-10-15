@@ -1,3 +1,5 @@
+import type { Sector } from './ideaflow';
+
 export function cleanGeminiKey(key: string): string {
   if (!key) return '';
   return key.trim().replace(/^Bearer\s+/i, '').replace(/^["']|["']$/g, '');
@@ -12,7 +14,7 @@ export const GEMINI_MODELS = [
 
 export async function handleGeminiBackend(body: any): Promise<any> {
   const { action, apiKey, message, contextText, history, rawText, sectors } = body;
-  const key = cleanGeminiKey(apiKey || process.env.VITE_GEMINI_API_KEY || '');
+  const key = cleanGeminiKey(apiKey || process.env['VITE_GEMINI_API_KEY'] || '');
 
   if (!key) {
     return { success: false, error: 'Chave do Google Gemini não fornecida.' };
@@ -78,14 +80,14 @@ ${contextText ? `Contexto atual do usuário no aplicativo:\n${contextText}` : ''
     for (const turn of validHistory) {
       const role: 'user' | 'model' = turn.role === 'model' ? 'model' : 'user';
       const last = sanitizedContents[sanitizedContents.length - 1];
-      if (last && last.role === role) {
+      if (last && last.role === role && last.parts[0]) {
         last.parts[0].text += `\n\n${turn.text.trim()}`;
       } else {
         sanitizedContents.push({ role, parts: [{ text: turn.text.trim() }] });
       }
     }
 
-    if (sanitizedContents.length > 0 && sanitizedContents[0].role === 'model') {
+    if (sanitizedContents.length > 0 && sanitizedContents[0]?.role === 'model') {
       sanitizedContents.unshift({
         role: 'user',
         parts: [{ text: 'Olá Mentor, gostaria de orientações sobre minhas ideias.' }],
@@ -93,7 +95,7 @@ ${contextText ? `Contexto atual do usuário no aplicativo:\n${contextText}` : ''
     }
 
     const last = sanitizedContents[sanitizedContents.length - 1];
-    if (last && last.role === 'user') {
+    if (last && last.role === 'user' && last.parts[0]) {
       last.parts[0].text += `\n\n${(message || '').trim()}`;
     } else {
       sanitizedContents.push({

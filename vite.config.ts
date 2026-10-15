@@ -14,8 +14,8 @@ export default defineConfig(({ command }) => ({
     }),
     {
       name: "gemini-api-dev",
-      configureServer(server) {
-        server.middlewares.use("/api/gemini", async (req, res) => {
+      configureServer(server: any) {
+        server.middlewares.use("/api/gemini", async (req: any, res: any) => {
           if (req.method === "POST") {
             let raw = "";
             req.on("data", (chunk: any) => {

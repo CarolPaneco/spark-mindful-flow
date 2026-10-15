@@ -82,9 +82,18 @@ function Index() {
   return (
     <>
       <div className="page-heading">
-        <div>
+        <div className="relative">
+          {/* Brilho cósmico ambiente atrás do título */}
+          <div className="absolute -top-8 -left-8 w-56 h-28 bg-primary/15 rounded-full blur-3xl pointer-events-none -z-10" />
+
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/25 text-primary text-[11px] font-semibold mb-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+            <Sparkles size={11} className="floating-spark text-primary" />
+            <span className="tracking-wide uppercase text-[10px]">Fluxo Criativo</span>
+          </div>
+
           <h1>
-            Suas ideias, <span>em movimento.</span>
+            Suas ideias, <span className="motion-heading-gradient">em movimento.</span>
           </h1>
           <p className="page-subtitle">
             Crie ideias individuais ou estruture projetos completos com frentes e módulos organizados.

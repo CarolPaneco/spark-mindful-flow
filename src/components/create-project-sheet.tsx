@@ -14,6 +14,9 @@ import {
   ArrowRight,
   Loader2,
   Bot,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
 } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
@@ -52,6 +55,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
   const [scope, setScope] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const hasGeminiKey = Boolean(getActiveGeminiKey());
 
@@ -131,6 +135,15 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
 
   const handleDeleteSubIdea = (id: string) => {
     setSubIdeas(prev => prev.filter(s => s.id !== id));
+  };
+
+  const handleMoveSubIdea = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= subIdeas.length) return;
+    const reordered = [...subIdeas];
+    const [moved] = reordered.splice(fromIndex, 1);
+    if (!moved) return;
+    reordered.splice(toIndex, 0, moved);
+    setSubIdeas(reordered);
   };
 
   const handleGenerateAiModules = async () => {
@@ -464,19 +477,60 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
                 {subIdeas.map((sub, index) => (
                   <div
                     key={sub.id}
-                    className="p-3.5 rounded-lg border border-border/80 bg-card space-y-2 shadow-xs text-xs"
+                    draggable
+                    onDragStart={() => setDraggedIndex(index)}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={() => {
+                      if (draggedIndex !== null && draggedIndex !== index) {
+                        handleMoveSubIdea(draggedIndex, index);
+                        setDraggedIndex(null);
+                      }
+                    }}
+                    className={`p-3.5 rounded-lg border bg-card space-y-2 shadow-xs text-xs transition-all ${
+                      draggedIndex === index ? 'opacity-50 border-primary border-dashed scale-[0.98]' : 'border-border/80 hover:border-border'
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-primary font-bold text-xs flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-[10px]">
-                          {String(index + 1).padStart(2, '0')}
+                      <div className="flex items-center gap-1.5">
+                        {/* Alça e botões de subir/descer */}
+                        <div className="flex items-center gap-0.5 select-none">
+                          <div
+                            className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground"
+                            title="Arraste para cima ou para baixo para reordenar"
+                          >
+                            <GripVertical size={14} />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={index === 0}
+                            onClick={() => handleMoveSubIdea(index, index - 1)}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none p-0.5 rounded cursor-pointer"
+                            title="Mover frente para cima"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index === subIdeas.length - 1}
+                            onClick={() => handleMoveSubIdea(index, index + 1)}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none p-0.5 rounded cursor-pointer"
+                            title="Mover frente para baixo"
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                        </div>
+
+                        <span className="font-mono text-primary font-bold text-xs flex items-center gap-1.5 ml-1">
+                          <span className="w-5 h-5 rounded-full bg-primary/15 flex items-center justify-center text-[10px]">
+                            {String(index + 1).padStart(2, '0')}
+                          </span>
+                          Ideia / Frente
                         </span>
-                        Ideia / Frente
-                      </span>
+                      </div>
 
                       <div className="flex items-center gap-2">
                         <select
-                          className="bg-secondary/40 border border-border/60 rounded px-2 py-0.5 text-[11px] text-foreground"
+                          className="bg-secondary/40 border border-border/60 rounded px-2 py-0.5 text-[11px] text-foreground cursor-pointer"
                           value={sub.minutes}
                           onChange={e => handleUpdateSubIdea(sub.id, { minutes: Number(e.target.value) })}
                         >

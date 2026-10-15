@@ -12,29 +12,16 @@ import {
   Target,
   Scissors,
   DollarSign,
-  HelpCircle,
-  Key,
-  ExternalLink,
+  Heart,
 } from 'lucide-react';
-import { toast } from 'sonner';
-import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
+import { Drawer, DrawerContent, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
+import { FormattedMessage } from '@/components/formatted-message';
 import {
   askMentorAi,
-  cleanGeminiKey,
-  getActiveGeminiKey,
-  setStoredGeminiKey,
-  testGeminiApiKey,
   type ChatMessage,
 } from '@/lib/ai-assistant';
-import {
-  getActiveGroqKey,
-  setStoredGroqKey,
-  cleanGroqKey,
-  testGroqApiKey,
-  isGroqActive,
-} from '@/lib/groq';
 import { type Idea } from '@/lib/ideaflow';
 
 export function AiChatSheet({
@@ -51,14 +38,6 @@ export function AiChatSheet({
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedIdeaId, setSelectedIdeaId] = useState<string>('all');
-  const [providerTag, setProviderTag] = useState<'local' | 'groq' | 'gemini'>('local');
-  const [hasGroq, setHasGroq] = useState(false);
-  const [hasGemini, setHasGemini] = useState(false);
-  const [showKeyConfig, setShowKeyConfig] = useState(false);
-  const [groqKeyInput, setGroqKeyInput] = useState('');
-  const [geminiKeyInput, setGeminiKeyInput] = useState('');
-  const [testingKey, setTestingKey] = useState(false);
-  const [keyTestError, setKeyTestError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,114 +47,25 @@ export function AiChatSheet({
   }, [initialIdea]);
 
   useEffect(() => {
-    if (open) {
-      const groqKey = getActiveGroqKey();
-      const geminiKey = getActiveGeminiKey();
-      const groqOk = Boolean(groqKey);
-      const geminiOk = Boolean(geminiKey);
-      setHasGroq(groqOk);
-      setHasGemini(geminiOk);
-      setGroqKeyInput(groqKey);
-      setGeminiKeyInput(geminiKey);
-      setProviderTag(groqOk ? 'groq' : geminiOk ? 'gemini' : 'local');
-    }
-  }, [open]);
-
-  useEffect(() => {
     if (open && messages.length === 0) {
-      const groqKey = getActiveGroqKey();
-      const geminiKey = getActiveGeminiKey();
-      const currentProvider = groqKey ? 'groq' : geminiKey ? 'gemini' : 'local';
       const welcome: ChatMessage = {
         id: 'welcome',
         sender: 'assistant',
         text: initialIdea
           ? `Olá! Estou focado na sua ideia **"${initialIdea.title}"**. Como posso te ajudar a avançar com ela hoje?`
-          : `Olá! Sou seu **Mentor Ideaflow**. Estou aqui para analisar suas ideias, sugerir passos práticos e te ajudar a transformar pensamentos em projetos reais. O que gostaria de explorar?`,
+          : `Olá! Sou seu **Mentor Ideaflow** com inteligência integrada estilo ChatGPT. Estou aqui para conversar, analisar seus funis, sugerir passos práticos e planejar projetos com você. O que gostaria de explorar hoje?`,
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        provider: currentProvider,
+        provider: 'chatgpt',
       };
       setMessages([welcome]);
     }
   }, [open, initialIdea]);
 
   useEffect(() => {
-    setMessages(prev =>
-      prev.map(m => (m.id === 'welcome' ? { ...m, provider: hasGroq ? 'groq' : hasGemini ? 'gemini' : 'local' } : m))
-    );
-  }, [hasGroq, hasGemini]);
-
-  useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, loading]);
 
   const activeIdea = selectedIdeaId === 'all' ? undefined : data.ideas.find(i => i.id === selectedIdeaId);
-
-  const handleSaveGroq = async () => {
-    const clean = cleanGroqKey(groqKeyInput);
-    if (!clean) {
-      setStoredGroqKey('');
-      setHasGroq(false);
-      setProviderTag(hasGemini ? 'gemini' : 'local');
-      setKeyTestError(null);
-      toast.info('Chave Groq removida.');
-      return;
-    }
-
-    setTestingKey(true);
-    setKeyTestError(null);
-    try {
-      const res = await testGroqApiKey(clean);
-      if (res.success) {
-        setStoredGroqKey(clean);
-        setHasGroq(true);
-        setProviderTag('groq');
-        setKeyTestError(null);
-        toast.success(`⚡ Groq Conectada com Sucesso! (LLaMA 3.3 Versatile)`);
-      } else {
-        setKeyTestError(res.error || 'A API da Groq rejeitou a chave.');
-        toast.error(`Erro ao validar Groq: ${res.error}`);
-      }
-    } catch (err: any) {
-      setKeyTestError(err?.message || 'Erro de conexão.');
-      toast.error(`Falha: ${err?.message}`);
-    } finally {
-      setTestingKey(false);
-    }
-  };
-
-  const handleSaveAndTestKey = async () => {
-    const clean = cleanGeminiKey(geminiKeyInput);
-    if (!clean) {
-      setStoredGeminiKey('');
-      setHasGemini(false);
-      setProviderTag(hasGroq ? 'groq' : 'local');
-      setKeyTestError(null);
-      toast.info('Chave Gemini removida.');
-      return;
-    }
-
-    setTestingKey(true);
-    setKeyTestError(null);
-    try {
-      const res = await testGeminiApiKey(clean);
-      if (res.success) {
-        setStoredGeminiKey(clean);
-        setHasGemini(true);
-        if (!hasGroq) setProviderTag('gemini');
-        setKeyTestError(null);
-        toast.success(`✨ Gemini 1.5 Flash conectado com sucesso!`);
-      } else {
-        setKeyTestError(res.error || 'A API da Google rejeitou a chave.');
-        toast.error(`Erro ao validar chave: ${res.error || 'Verifique se a chave está ativa'}`);
-      }
-    } catch (err: any) {
-      setKeyTestError(err?.message || 'Erro de conexão.');
-      toast.error(`Falha: ${err?.message}`);
-    } finally {
-      setTestingKey(false);
-    }
-  };
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend ?? inputText;
@@ -193,7 +83,7 @@ export function AiChatSheet({
     setLoading(true);
 
     try {
-      // Constrói o histórico da conversa recente para dar memória contextual ao Gemini
+      // Constrói o histórico da conversa recente para dar memória contextual ao modelo
       const history = messages
         .filter(m => m.id !== 'welcome')
         .slice(-10)
@@ -202,14 +92,13 @@ export function AiChatSheet({
           text: m.text,
         }));
 
-      const { reply, provider, error } = await askMentorAi({
+      const { reply, provider } = await askMentorAi({
         message: text.trim(),
-        contextIdea: activeIdea,
+        ...(activeIdea ? { contextIdea: activeIdea } : {}),
         allIdeas: data.ideas,
+        sectors: data.sectors,
         history,
       });
-
-      setProviderTag(provider);
 
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -224,8 +113,9 @@ export function AiChatSheet({
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         sender: 'assistant',
-        text: 'Desculpe, ocorreu um erro ao processar sua resposta. Tente novamente em instantes.',
+        text: 'Desculpe, ocorreu um erro momentâneo ao processar sua resposta. Pode tentar novamente?',
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        provider: 'local',
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
@@ -243,6 +133,7 @@ export function AiChatSheet({
     : [
         { label: 'Qual focar hoje?', icon: Target, prompt: 'Com base no meu funil de ideias, qual projeto devo priorizar hoje?' },
         { label: 'Diagnóstico do funil', icon: Lightbulb, prompt: 'Analise o status geral das minhas ideias e me diga onde está o maior gargalo.' },
+        { label: 'Acolhimento & Desabafo', icon: Heart, prompt: 'Estou me sentindo desanimado(a) e sobrecarregado(a) hoje. Pode me ouvir e me ajudar com gentileza?' },
         { label: 'Técnica anti-procrastinação', icon: Zap, prompt: 'Estou com dificuldade de começar a executar. Qual exercício prático de 5 minutos você me recomenda?' },
         { label: 'Como validar rápido?', icon: Compass, prompt: 'Qual o método mais rápido para validar uma ideia antes de gastar semanas construindo?' },
       ];
@@ -264,16 +155,9 @@ export function AiChatSheet({
                     <span className="text-[11px] font-medium flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
                       <span className="text-green font-semibold">
-                        {hasGroq ? 'Groq LLaMA 3.3 Ativo ⚡' : hasGemini ? 'Gemini Flash Ativo' : 'IA Oficial Fixa & Online'}
+                        IA Oficial Integrada (Estilo ChatGPT) ✨
                       </span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowKeyConfig(prev => !prev)}
-                      className="text-[10px] text-muted-foreground hover:text-foreground underline cursor-pointer ml-1"
-                    >
-                      Configurar IA
-                    </button>
                   </div>
                 </div>
               </div>
@@ -281,133 +165,13 @@ export function AiChatSheet({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
                 title="Limpar conversa"
                 onClick={() => setMessages([])}
               >
                 <Trash2 size={14} />
               </Button>
             </div>
-
-            {/* Painel Expansível de Configuração de IA (Groq / Gemini) */}
-            {showKeyConfig && (
-              <div className="p-3 rounded-lg bg-card border border-primary/40 space-y-3 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-foreground flex items-center gap-1.5">
-                    <Zap size={14} className="text-primary" />
-                    Chave Groq API (Recomendada · LLaMA 3.3)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowKeyConfig(false)}
-                    className="text-muted-foreground hover:text-foreground text-xs"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  A Groq é 100% gratuita, sem bloqueios de CORS e ultra-rápida. Gere em 30 segundos no{' '}
-                  <a
-                    href="https://console.groq.com/keys"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary underline inline-flex items-center gap-0.5 font-medium"
-                  >
-                    console.groq.com/keys <ExternalLink size={10} />
-                  </a>
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={groqKeyInput}
-                    onChange={e => {
-                      setGroqKeyInput(e.target.value);
-                      if (keyTestError) setKeyTestError(null);
-                    }}
-                    placeholder="Cole sua chave Groq (gsk_...)"
-                    className="flex-1 bg-background border border-border rounded px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-                  />
-                  <Button
-                    size="sm"
-                    className="h-7 text-xs px-3 primary-action gap-1"
-                    disabled={testingKey}
-                    onClick={handleSaveGroq}
-                  >
-                    {testingKey ? 'Testando...' : 'Salvar Groq'}
-                  </Button>
-                  {hasGroq && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs px-2 text-destructive hover:bg-destructive/10"
-                      disabled={testingKey}
-                      onClick={() => {
-                        setStoredGroqKey('');
-                        setGroqKeyInput('');
-                        setHasGroq(false);
-                        setProviderTag(hasGemini ? 'gemini' : 'local');
-                        setKeyTestError(null);
-                        toast.info('Chave Groq removida.');
-                      }}
-                    >
-                      Remover
-                    </Button>
-                  )}
-                </div>
-
-                <div className="pt-2 border-t border-border">
-                  <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
-                    <Key size={12} />
-                    Google Gemini (Opcional Alternativo)
-                  </span>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={geminiKeyInput}
-                      onChange={e => {
-                        setGeminiKeyInput(e.target.value);
-                        if (keyTestError) setKeyTestError(null);
-                      }}
-                      placeholder="Cole sua chave Gemini (AIzaSy...)"
-                      className="flex-1 bg-background border border-border rounded px-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-                    />
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 text-xs px-3 gap-1"
-                      disabled={testingKey}
-                      onClick={handleSaveAndTestKey}
-                    >
-                      Salvar Gemini
-                    </Button>
-                    {hasGemini && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs px-2 text-destructive hover:bg-destructive/10"
-                        disabled={testingKey}
-                        onClick={() => {
-                          setStoredGeminiKey('');
-                          setGeminiKeyInput('');
-                          setHasGemini(false);
-                          setProviderTag(hasGroq ? 'groq' : 'local');
-                          setKeyTestError(null);
-                          toast.info('Chave Gemini removida.');
-                        }}
-                      >
-                        Remover
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {keyTestError && (
-                  <div className="p-2 rounded bg-destructive/10 border border-destructive/30 text-destructive text-[11px] leading-relaxed">
-                    <strong>Erro:</strong> {keyTestError}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Seletor de Contexto: Ideia Específica ou Funil Geral */}
@@ -428,7 +192,7 @@ export function AiChatSheet({
           </div>
 
           {/* Área de Mensagens com Rolagem */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3 pr-1 text-xs">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto py-3 space-y-3 pr-1 text-xs">
             {messages.map(msg => (
               <div
                 key={msg.id}
@@ -441,21 +205,33 @@ export function AiChatSheet({
                 )}
 
                 <div
-                  className={`max-w-[85%] rounded-xl p-3 leading-relaxed whitespace-pre-wrap ${
+                  className={`max-w-[85%] rounded-xl p-3 leading-relaxed ${
                     msg.sender === 'user'
-                      ? 'bg-primary text-primary-foreground font-medium rounded-tr-none'
+                      ? 'bg-primary text-primary-foreground font-medium rounded-tr-none whitespace-pre-wrap'
                       : 'bg-card border border-border text-foreground rounded-tl-none shadow-xs'
                   }`}
                 >
-                  {msg.text}
+                  {msg.sender === 'assistant' ? (
+                    <FormattedMessage content={msg.text} />
+                  ) : (
+                    msg.text
+                  )}
                   <div
-                    className={`flex items-center gap-1.5 mt-1.5 text-[9px] ${
+                    className={`flex items-center gap-1.5 mt-2 text-[9px] ${
                       msg.sender === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
                     }`}
                   >
                     {msg.sender === 'assistant' && (
-                      <span className={msg.provider === 'gemini' ? 'text-primary font-semibold' : 'text-muted-foreground'}>
-                        {msg.provider === 'gemini' ? '✨ Gemini 1.5 Flash' : '⚡ Motor Local'}
+                      <span
+                        className={
+                          msg.provider === 'chatgpt'
+                            ? 'text-cyan font-semibold'
+                            : 'text-green font-semibold'
+                        }
+                      >
+                        {msg.provider === 'chatgpt'
+                          ? '✨ ChatGPT Integrado (Online)'
+                          : '🛡️ Mentor IA Oficial (Ativo)'}
                       </span>
                     )}
                     {msg.sender === 'assistant' && <span>·</span>}
@@ -472,9 +248,9 @@ export function AiChatSheet({
             ))}
 
             {loading && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 italic">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground py-2 italic animate-pulse">
                 <Wand2 size={14} className="animate-spin text-primary" />
-                O Mentor está formulando a melhor estratégia para você...
+                O Mentor está pensando e formulando sua resposta...
               </div>
             )}
           </div>
@@ -486,7 +262,7 @@ export function AiChatSheet({
                 key={idx}
                 variant="outline"
                 size="sm"
-                className="h-7 text-[11px] gap-1 shrink-0 bg-card/60 hover:bg-secondary border-border/70"
+                className="h-7 text-[11px] gap-1 shrink-0 bg-card/60 hover:bg-secondary border-border/70 cursor-pointer"
                 onClick={() => handleSendMessage(q.prompt)}
               >
                 <q.icon size={11} className="text-primary" />
@@ -505,23 +281,20 @@ export function AiChatSheet({
               className="flex items-center gap-2"
             >
               <input
-                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-primary"
-                placeholder={
-                  activeIdea
-                    ? `Pergunte algo sobre "${activeIdea.title.slice(0, 30)}..."`
-                    : 'Pergunte qualquer coisa ao Mentor Ideaflow...'
-                }
+                type="text"
                 value={inputText}
                 onChange={e => setInputText(e.target.value)}
+                placeholder="Pergunte ao Mentor ou converse sobre suas ideias..."
+                className="flex-1 bg-secondary/60 border border-border rounded-xl px-3.5 py-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
+                disabled={loading}
               />
               <Button
                 type="submit"
-                size="sm"
-                className="h-8 px-3 text-xs gap-1 primary-action shrink-0"
-                disabled={!inputText.trim() || loading}
+                size="icon"
+                disabled={loading || !inputText.trim()}
+                className="h-9 w-9 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer active:scale-95"
               >
-                <Send size={13} />
-                Enviar
+                <Send size={14} />
               </Button>
             </form>
           </div>
@@ -530,4 +303,3 @@ export function AiChatSheet({
     </Drawer>
   );
 }
-

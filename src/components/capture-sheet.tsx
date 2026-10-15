@@ -12,6 +12,9 @@ import {
   Clock,
   SlidersHorizontal,
   Wand2,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
 } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
@@ -43,6 +46,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState<Idea | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
   const recognition = useRef<SpeechRecognizer | null>(null);
 
   useEffect(() => {
@@ -135,6 +139,19 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
     const updated = [...draft.steps, newStep];
     const totalMinutes = updated.reduce((acc, curr) => acc + curr.minutes, 0);
     setDraft({ ...draft, steps: updated, minutes: totalMinutes });
+  };
+
+  const handleMoveStep = (fromIndex: number, toIndex: number) => {
+    if (!draft || toIndex < 0 || toIndex >= draft.steps.length) return;
+    const reordered = [...draft.steps];
+    const [moved] = reordered.splice(fromIndex, 1);
+    if (!moved) return;
+    reordered.splice(toIndex, 0, moved);
+    setDraft({
+      ...draft,
+      steps: reordered,
+      immediate: reordered[0]?.text ?? draft.immediate,
+    });
   };
 
   const handleRegenerateWithAi = (style: 'mvp' | 'rapido' | 'estruturado' | 'expansao') => {
@@ -466,9 +483,50 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                   {draft.steps.map((s, i) => (
                     <div
                       key={s.id ?? i}
-                      className="flex items-start gap-2.5 p-2.5 rounded-md bg-background/80 border border-border/50 text-xs"
+                      draggable
+                      onDragStart={() => setDraggedStepIndex(i)}
+                      onDragOver={e => e.preventDefault()}
+                      onDrop={() => {
+                        if (draggedStepIndex !== null && draggedStepIndex !== i) {
+                          handleMoveStep(draggedStepIndex, i);
+                          setDraggedStepIndex(null);
+                        }
+                      }}
+                      className={`flex items-start gap-2 p-2.5 rounded-lg bg-background/90 border text-xs transition-all ${
+                        draggedStepIndex === i ? 'opacity-50 border-primary border-dashed scale-[0.98]' : 'border-border/60 hover:border-border'
+                      }`}
                     >
-                      <span className="font-mono text-primary font-semibold text-xs min-w-5 pt-1 select-none">
+                      {/* Alça de Arraste e Setas para Subir / Descer */}
+                      <div className="flex flex-col items-center gap-0.5 shrink-0 pt-0.5 select-none">
+                        <div
+                          className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground"
+                          title="Arraste para cima ou para baixo para reordenar"
+                        >
+                          <GripVertical size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                          <button
+                            type="button"
+                            disabled={i === 0}
+                            onClick={() => handleMoveStep(i, i - 1)}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none p-0.5 rounded cursor-pointer"
+                            title="Mover para cima"
+                          >
+                            <ChevronUp size={11} />
+                          </button>
+                          <button
+                            type="button"
+                            disabled={i === draft.steps.length - 1}
+                            onClick={() => handleMoveStep(i, i + 1)}
+                            className="text-muted-foreground hover:text-foreground disabled:opacity-20 disabled:pointer-events-none p-0.5 rounded cursor-pointer"
+                            title="Mover para baixo"
+                          >
+                            <ChevronDown size={11} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <span className="font-mono text-primary font-bold text-xs min-w-5 pt-1 select-none">
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       <textarea

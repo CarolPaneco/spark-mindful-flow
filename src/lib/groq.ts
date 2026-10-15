@@ -7,16 +7,20 @@ export function cleanGroqKey(key: string): string {
   return key.trim().replace(/^Bearer\s+/i, '').replace(/^["']|["']$/g, '');
 }
 
+export const DEFAULT_GROQ_KEY = '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';
+
 export function getActiveGroqKey(): string {
   if (typeof window !== 'undefined') {
     const stored = localStorage.getItem(GROQ_STORAGE_KEY);
     if (stored && stored.trim()) return cleanGroqKey(stored);
   }
-  const envKey = (import.meta as any).env?.VITE_GROQ_API_KEY;
+  const envKey =
+    (import.meta as any).env?.VITE_GROQ_API_KEY ||
+    (typeof process !== 'undefined' ? process.env?.['VITE_GROQ_API_KEY'] : '');
   if (typeof envKey === 'string' && envKey.trim()) {
     return cleanGroqKey(envKey);
   }
-  return '';
+  return DEFAULT_GROQ_KEY;
 }
 
 export function setStoredGroqKey(key: string) {
@@ -173,7 +177,7 @@ Responda EXCLUSIVAMENTE um objeto JSON válido (sem tags markdown nem explicaç�
     const matchedSector =
       sectors.find(s => s.id === parsed.sectorId) ??
       sectors.find(s => s.id === 'personal') ??
-      sectors[0];
+      sectors[0] ?? { id: 'personal', name: 'Pessoal', tone: 'pink' as const };
 
     const steps: Step[] = (parsed.steps || []).map((s: any, idx: number) => ({
       id: crypto.randomUUID(),
