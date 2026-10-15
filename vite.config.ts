@@ -15,6 +15,16 @@ export default defineConfig(({ command }) => ({
     {
       name: "gemini-api-dev",
       configureServer(server: any) {
+        server.middlewares.use((req: any, res: any, next: any) => {
+          if (req.url === "/api/health" || req.url === "/api/ping" || req.url === "/ping") {
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "application/json");
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.end(JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }));
+            return;
+          }
+          next();
+        });
         server.middlewares.use("/api/gemini", async (req: any, res: any) => {
           if (req.method === "POST") {
             let raw = "";

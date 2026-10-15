@@ -17,6 +17,12 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from '@/components/ui/drawer';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
 import { planIdea, formatMinutes, generateAiSteps, type Idea, type Step } from '@/lib/ideaflow';
@@ -48,6 +54,18 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [generating, setGenerating] = useState(false);
   const [draggedStepIndex, setDraggedStepIndex] = useState<number | null>(null);
   const recognition = useRef<SpeechRecognizer | null>(null);
+
+  // Detecção de Desktop (>= 769px) para abrir modal imersivo e espaçoso no Web
+  const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth >= 769;
+  });
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 769);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (!open) {
@@ -200,27 +218,20 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
     onClose();
   };
 
-  return (
-    <Drawer
-      open={open}
-      onOpenChange={v => {
-        if (!v) onClose();
-      }}
-    >
-      <DrawerContent className="max-h-[92vh]">
-        <div className="sheet-body max-w-2xl mx-auto w-full">
-          <div className="sheet-eyebrow">
-            <Sparkles size={15} />
-            TODA REALIZAÇÃO COMEÇA AQUI
-          </div>
-          <DrawerTitle className="sheet-title">
-            {draft ? 'Personalize o plano da sua ideia.' : 'O que está na sua cabeça?'}
-          </DrawerTitle>
-          <DrawerDescription className="mt-2 text-sm text-muted-foreground">
-            {draft
-              ? 'A IA gerou estes passos iniciais. Você pode editar, apagar ou adicionar novos como preferir.'
-              : 'Solte a ideia livremente. Nosso assistente encontra o primeiro passo executável.'}
-          </DrawerDescription>
+  const content = (
+    <div className="sheet-body max-w-3xl mx-auto w-full p-2 sm:p-4">
+      <div className="sheet-eyebrow">
+        <Sparkles size={15} />
+        TODA REALIZAÇÃO COMEÇA AQUI
+      </div>
+      <h2 className="sheet-title text-2xl sm:text-3xl font-display font-bold text-foreground">
+        {draft ? 'Personalize o plano da sua ideia.' : 'O que está na sua cabeça?'}
+      </h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {draft
+          ? 'A IA gerou estes passos iniciais. Você pode editar, apagar ou adicionar novos como preferir.'
+          : 'Solte a ideia livremente. Nosso assistente encontra o primeiro passo executável.'}
+      </p>
 
           {!draft ? (
             <>
@@ -590,7 +601,47 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
               </div>
             </div>
           )}
-        </div>
+    </div>
+  );
+
+  // No Desktop / Web: Modal centralizado amplo e espaçoso com rolagem própria
+  if (isDesktop) {
+    return (
+      <Dialog
+        open={open}
+        onOpenChange={v => {
+          if (!v) onClose();
+        }}
+      >
+        <DialogContent className="max-w-3xl w-[90vw] max-h-[88vh] overflow-y-auto p-6 sm:p-8 rounded-3xl border border-border bg-card/95 backdrop-blur-2xl shadow-2xl">
+          <DialogTitle className="sr-only">
+            {draft ? 'Personalize o plano da sua ideia.' : 'O que está na sua cabeça?'}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulário para captura e planejamento de nova ideia ou faísca.
+          </DialogDescription>
+          {content}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // No Mobile: Gaveta inferior fluida (Drawer)
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={v => {
+        if (!v) onClose();
+      }}
+    >
+      <DrawerContent className="max-h-[92vh]">
+        <DrawerTitle className="sr-only">
+          {draft ? 'Personalize o plano da sua ideia.' : 'O que está na sua cabeça?'}
+        </DrawerTitle>
+        <DrawerDescription className="sr-only">
+          Formulário para captura e planejamento de nova ideia ou faísca.
+        </DrawerDescription>
+        {content}
       </DrawerContent>
     </Drawer>
   );
