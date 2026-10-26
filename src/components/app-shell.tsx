@@ -23,11 +23,11 @@ import { AiChatSheet } from '@/components/ai-chat-sheet';
 import { ProfileSidebar } from '@/components/profile-sidebar';
 import { IdeaDetail } from '@/components/idea-detail';
 import { AuthModal } from '@/components/auth-modal';
-import { SplashScreen } from '@/components/splash-screen';
 import { OnboardingTutorial } from '@/components/onboarding-tutorial';
 import avatar from '@/assets/ideaflow-avatar.png';
-import { Idea } from '@/lib/ideaflow';
-import { User, LogIn, Cloud, CloudCheck, RefreshCw } from 'lucide-react';
+import { Idea, createStarterBusinessIdeas, defaultCompanyWorkspace } from '@/lib/ideaflow';
+import { User, LogIn, LogOut, Cloud, CloudCheck, RefreshCw, Building2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const navigation = [
   { to: '/', name: 'Funil', icon: Layers3 },
@@ -37,7 +37,7 @@ const navigation = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { data, setData, user, profile, isSyncing, syncWithCloud } = useFlow();
+  const { data, setData, user, profile, isSyncing, syncWithCloud, requestSwitchWorkspace, signOut, pendingRequests } = useFlow();
   const [capture, setCapture] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -46,7 +46,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mentorIdea, setMentorIdea] = useState<Idea | null>(null);
   const [greeting, setGreeting] = useState('Que bom ter você aqui');
   const [online, setOnline] = useState(true);
-  const [showSplash, setShowSplash] = useState(true);
   const [showTutorial, setShowTutorial] = useState(false);
   const path = useRouterState({ select: state => state.location.pathname });
 
@@ -68,14 +67,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       localStorage.setItem('ideaflow_sidebar_collapsed', String(next));
       return next;
     });
-  };
-
-  const handleSplashComplete = () => {
-    setShowSplash(false);
-    // Passo 2: Se não estiver logado e não for convidado, abre a tela de autenticação
-    if (!user && !guestMode) {
-      setAuthOpen(true);
-    }
   };
 
   const handleAuthSuccess = () => {
@@ -129,6 +120,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const dedicated = data.ideas.reduce((sum, i) => sum + i.dedicated, 0);
   const isAuthorized = Boolean(user || guestMode);
+  const userDisplayName =
+    (user?.user_metadata as any)?.name ||
+    (user?.user_metadata as any)?.full_name ||
+    data.profile?.name ||
+    user?.email?.split('@')[0] ||
+    'Usuário';
+  const userInitial = (userDisplayName.trim()[0] || 'U').toUpperCase();
 
   return (
     <div
@@ -187,6 +185,61 @@ export function AppShell({ children }: { children: ReactNode }) {
               </>
             )}
           </button>
+
+          {/* Seletor Rápido de Workspace no Menu Lateral */}
+          {!sidebarCollapsed ? (
+            <div className="p-1 rounded-xl bg-secondary/50 border border-border/80 flex items-center justify-between gap-1 text-xs">
+              <button
+                type="button"
+                onClick={() => requestSwitchWorkspace('personal')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs ${
+                  (data.workspaceMode ?? 'personal') === 'personal'
+                    ? 'bg-card text-foreground shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Ir para o Espaço Pessoal (exige PIN se estiver na Empresa)"
+              >
+                <User size={13} className={(data.workspaceMode ?? 'personal') === 'personal' ? 'text-primary' : ''} />
+                <span>Pessoal</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => requestSwitchWorkspace('business')}
+                className={`flex-1 py-1.5 px-2 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer text-xs relative ${
+                  data.workspaceMode === 'business'
+                    ? 'bg-violet-600 text-white shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Ir para o Workspace da Empresa"
+              >
+                <Building2 size={13} />
+                <span>Empresa</span>
+                {data.companyWorkspace?.isKeyUser && pendingRequests.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-bold animate-pulse" title={`${pendingRequests.length} pedido(s) pendente(s)`}>
+                    {pendingRequests.length}
+                  </span>
+                )}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => requestSwitchWorkspace(data.workspaceMode === 'business' ? 'personal' : 'business')}
+              className={`w-11 h-11 mx-auto rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+                data.workspaceMode === 'business'
+                  ? 'bg-violet-600 text-white shadow-xs'
+                  : 'bg-secondary/70 text-muted-foreground hover:text-foreground'
+              }`}
+              title={data.workspaceMode === 'business' ? 'Empresa (Clique para Pessoal)' : 'Pessoal (Clique para Empresa)'}
+            >
+              {data.workspaceMode === 'business' ? <Building2 size={18} /> : <User size={18} />}
+              {data.companyWorkspace?.isKeyUser && pendingRequests.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold flex items-center justify-center animate-pulse">
+                  {pendingRequests.length}
+                </span>
+              )}
+            </button>
+          )}
 
           {/* Itens de Navegação Verticais */}
           <nav className="space-y-1.5 w-full" aria-label="Navegação Lateral">
@@ -284,29 +337,43 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Usuário / Login & Tema */}
           <div className={`flex items-center ${sidebarCollapsed ? 'flex-col gap-2' : 'justify-between pt-1'}`}>
             {user ? (
-              <button
-                type="button"
-                onClick={() => setProfileOpen(true)}
-                className={`flex items-center rounded-xl hover:bg-secondary/70 transition-colors text-left text-xs text-foreground cursor-pointer group ${
-                  sidebarCollapsed ? 'p-1' : 'gap-2.5 p-1.5 flex-1 mr-2 truncate'
-                }`}
-                title="Meu Perfil"
-              >
-                <div className="relative shrink-0">
-                  <img
-                    src={avatar}
-                    alt="Avatar"
-                    className="w-8 h-8 rounded-full ring-1 ring-border group-hover:ring-primary/50 transition-all"
-                  />
-                  <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green border-2 border-background" />
-                </div>
-                {!sidebarCollapsed && (
-                  <div className="truncate">
-                    <p className="font-semibold truncate">{(user.user_metadata as any)?.name || user.email?.split('@')[0]}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+              <div className="flex items-center flex-1 mr-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(true)}
+                  className={`flex items-center rounded-xl hover:bg-secondary/70 transition-colors text-left text-xs text-foreground cursor-pointer group ${
+                    sidebarCollapsed ? 'p-1' : 'gap-2.5 p-1.5 flex-1 min-w-0 truncate'
+                  }`}
+                  title="Meu Perfil"
+                >
+                  <div className="relative shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary via-primary/85 to-violet-600 text-white font-bold flex items-center justify-center text-xs shadow-xs ring-1 ring-border group-hover:ring-primary/50 transition-all select-none">
+                      {userInitial}
+                    </div>
+                    <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green border-2 border-background" />
                   </div>
-                )}
-              </button>
+                  {!sidebarCollapsed && (
+                    <div className="truncate min-w-0">
+                      <p className="font-semibold truncate">{(user.user_metadata as any)?.name || user.email?.split('@')[0]}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                  )}
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 cursor-pointer ${
+                    sidebarCollapsed ? 'h-7 w-7 mt-1' : 'h-8 w-8'
+                  }`}
+                  title="Sair da conta e ver tela de entrada"
+                  onClick={async () => {
+                    await signOut();
+                    setAuthOpen(true);
+                  }}
+                >
+                  <LogOut size={sidebarCollapsed ? 14 : 15} />
+                </Button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -362,9 +429,48 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
 
             {/* Breadcrumb / Status discreto no Desktop */}
-            <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground font-semibold">
+            <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground font-semibold">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               <span>Painel de Realização</span>
+            </div>
+
+            {/* Alternador Global de Espaço: Pessoal vs Empresarial */}
+            <div className="inline-flex items-center p-0.5 rounded-full bg-secondary/80 border border-border/80 text-xs shadow-xs">
+              <button
+                type="button"
+                onClick={() => requestSwitchWorkspace('personal')}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs ${
+                  (data.workspaceMode ?? 'personal') === 'personal'
+                    ? 'bg-background text-foreground shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Alternar para Espaço Pessoal (exige PIN de 4 dígitos)"
+              >
+                <User size={12} className={(data.workspaceMode ?? 'personal') === 'personal' ? 'text-primary' : ''} />
+                <span className="hidden sm:inline">Pessoal</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => requestSwitchWorkspace('business')}
+                className={`px-2.5 py-1 rounded-full font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs relative ${
+                  data.workspaceMode === 'business'
+                    ? 'bg-violet-600 text-white shadow-xs font-bold'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title="Alternar para Espaço da Empresa"
+              >
+                <Building2 size={12} />
+                <span className="truncate max-w-[120px] hidden sm:inline">
+                  {data.companyWorkspace?.name ? data.companyWorkspace.name.split(' ')[0] : 'Empresa'}
+                </span>
+                <span className="sm:hidden">Empresa</span>
+                {data.companyWorkspace?.isKeyUser && pendingRequests.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-bold animate-pulse" title={`${pendingRequests.length} solicitações de adesão`}>
+                    {pendingRequests.length}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
           <div className="header-right flex items-center gap-1.5 sm:gap-2.5 shrink-0">
@@ -373,12 +479,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               variant="outline"
               size="sm"
               data-tour="mentor"
-              className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 border-primary/40 bg-gradient-to-r from-primary/15 via-primary/10 to-violet/15 text-primary hover:bg-primary/25 active:scale-95 transition-all shadow-xs px-2.5 sm:px-3.5 rounded-full font-semibold shrink-0 cursor-pointer"
+              className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 border-primary/50 bg-gradient-to-r from-primary/20 via-primary/10 to-violet/20 text-primary hover:bg-primary/25 active:scale-95 transition-all shadow-xs hover:shadow-primary/25 px-2.5 sm:px-3.5 rounded-full font-semibold shrink-0 cursor-pointer relative overflow-hidden group"
               onClick={() => {
                 setMentorIdea(null);
                 setAiChatOpen(true);
               }}
             >
+              <span className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
               <Sparkles size={13} className="text-primary animate-pulse" />
               <span>Mentor IA</span>
             </Button>
@@ -439,14 +546,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 title="Abrir Meu Perfil"
                 aria-label="Perfil do Usuário"
               >
-                <img
-                  src={avatar}
-                  alt="Avatar holográfico"
-                  className="avatar hover:ring-2 hover:ring-primary/60 transition-all"
-                  width={34}
-                  height={34}
-                />
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green border-2 border-background" />
+                <div className="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-primary via-primary/85 to-violet-600 text-white font-bold flex items-center justify-center text-sm shadow-xs ring-1 ring-primary/40 hover:ring-2 hover:ring-primary/80 transition-all select-none">
+                  {userInitial}
+                </div>
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green border-2 border-background shadow-xs shadow-green animate-pulse" />
               </button>
             ) : (
               <button
@@ -456,14 +559,27 @@ export function AppShell({ children }: { children: ReactNode }) {
                 title="Fazer Login / Cadastrar"
                 aria-label="Perfil do Usuário"
               >
-                <img
-                  src={avatar}
-                  alt="Avatar holográfico"
-                  className="avatar hover:ring-2 hover:ring-primary/60 transition-all opacity-85"
-                  width={34}
-                  height={34}
-                />
+                <div className="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-primary/70 to-secondary text-foreground font-bold flex items-center justify-center text-sm border border-border/80 hover:ring-2 hover:ring-primary/60 transition-all select-none">
+                  {userInitial}
+                </div>
               </button>
+            )}
+
+            {/* Botão Explícito de Sair (se logado) */}
+            {user && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 sm:h-9 text-xs gap-1.5 border-destructive/35 text-destructive hover:bg-destructive/10 active:scale-95 transition-all px-2.5 sm:px-3 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer ml-1"
+                onClick={async () => {
+                  await signOut();
+                  setAuthOpen(true);
+                }}
+                title="Sair da conta e ver tela de entrada"
+              >
+                <LogOut size={13} />
+                <span className="hidden sm:inline">Sair</span>
+              </Button>
             )}
           </div>
         </div>
@@ -548,7 +664,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         onClose={handleAuthClose}
         onSuccess={handleAuthSuccess}
       />
-      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       <OnboardingTutorial
         open={showTutorial}
         onClose={() => {

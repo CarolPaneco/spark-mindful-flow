@@ -72,8 +72,13 @@ function Today() {
     );
   }, []);
 
-  const scheduled = date ? data.ideas.filter(i => !i.archived && i.day === date) : [];
-  const ready = data.ideas.filter(i => !i.archived && i.stage > 0 && i.stage < 4 && i.day !== date);
+  const isBusiness = data.workspaceMode === 'business';
+  const workspaceIdeas = data.ideas.filter(i =>
+    isBusiness ? i.workspace === 'business' : i.workspace !== 'business'
+  );
+
+  const scheduled = date ? workspaceIdeas.filter(i => !i.archived && i.day === date) : [];
+  const ready = workspaceIdeas.filter(i => !i.archived && i.stage > 0 && i.stage < 4 && i.day !== date);
 
   // Lógica para montar a matriz de dias do calendário
   const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1).getDay();

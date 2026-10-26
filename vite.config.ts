@@ -25,6 +25,39 @@ export default defineConfig(({ command }) => ({
           }
           next();
         });
+        server.middlewares.use("/api/ai", async (req: any, res: any) => {
+          if (req.method === "POST") {
+            let raw = "";
+            req.on("data", (chunk: any) => {
+              raw += chunk;
+            });
+            req.on("end", async () => {
+              try {
+                const parsed = JSON.parse(raw);
+                const { handleGeminiBackend } = await server.ssrLoadModule("/src/lib/gemini-server.ts");
+                const result = await handleGeminiBackend(parsed);
+                res.statusCode = 200;
+                res.setHeader("Content-Type", "application/json");
+                res.setHeader("Access-Control-Allow-Origin", "*");
+                res.end(JSON.stringify(result));
+              } catch (err: any) {
+                res.statusCode = 500;
+                res.setHeader("Content-Type", "application/json");
+                res.setHeader("Access-Control-Allow-Origin", "*");
+                res.end(JSON.stringify({ success: false, error: err.message }));
+              }
+            });
+          } else if (req.method === "OPTIONS") {
+            res.statusCode = 204;
+            res.setHeader("Access-Control-Allow-Origin", "*");
+            res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+            res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+            res.end();
+          } else {
+            res.statusCode = 405;
+            res.end();
+          }
+        });
         server.middlewares.use("/api/gemini", async (req: any, res: any) => {
           if (req.method === "POST") {
             let raw = "";

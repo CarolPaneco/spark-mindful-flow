@@ -21,6 +21,9 @@ import { FormattedMessage } from '@/components/formatted-message';
 import {
   askMentorAi,
   type ChatMessage,
+  getActiveGeminiKey,
+  getActiveGroqKey,
+  getPreferredAiProvider,
 } from '@/lib/ai-assistant';
 import { type Idea } from '@/lib/ideaflow';
 
@@ -92,7 +95,7 @@ export function AiChatSheet({
           text: m.text,
         }));
 
-      const { reply, provider } = await askMentorAi({
+      const result = await askMentorAi({
         message: text.trim(),
         ...(activeIdea ? { contextIdea: activeIdea } : {}),
         allIdeas: data.ideas,
@@ -103,9 +106,11 @@ export function AiChatSheet({
       const aiMsg: ChatMessage = {
         id: crypto.randomUUID(),
         sender: 'assistant',
-        text: reply,
+        text: result.reply,
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        provider,
+        provider: result.provider,
+        model: result.model,
+        tokensUsed: result.tokensUsed,
       };
 
       setMessages(prev => [...prev, aiMsg]);
@@ -152,11 +157,9 @@ export function AiChatSheet({
                 <div>
                   <DrawerTitle className="sheet-title text-xl m-0">Mentor Ideaflow</DrawerTitle>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] font-medium flex items-center gap-1.5">
+                    <span className="text-[11px] font-medium flex items-center gap-1.5 text-green">
                       <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
-                      <span className="text-green font-semibold">
-                        IA Oficial Integrada (Estilo ChatGPT) ✨
-                      </span>
+                      <span>IA Oficial Integrada (Groq LLaMA 3.3 70B · Gratuita) ⚡</span>
                     </span>
                   </div>
                 </div>
@@ -224,14 +227,25 @@ export function AiChatSheet({
                     {msg.sender === 'assistant' && (
                       <span
                         className={
-                          msg.provider === 'chatgpt'
-                            ? 'text-cyan font-semibold'
-                            : 'text-green font-semibold'
+                          msg.provider === 'gemini'
+                            ? 'text-cyan font-semibold flex items-center gap-1'
+                            : msg.provider === 'groq'
+                            ? 'text-violet font-semibold flex items-center gap-1'
+                            : 'text-amber-500 font-semibold flex items-center gap-1'
                         }
                       >
-                        {msg.provider === 'chatgpt'
-                          ? '✨ ChatGPT Integrado (Online)'
-                          : '🛡️ Mentor IA Oficial (Ativo)'}
+                        {msg.provider === 'gemini' && (
+                          <span>✨ Google Gemini ({msg.model || 'Flash'}){msg.tokensUsed ? ` · ${msg.tokensUsed.totalTokens} tokens` : ''}</span>
+                        )}
+                        {msg.provider === 'groq' && (
+                          <span>🚀 Groq ({msg.model || 'LLaMA 3.3'}){msg.tokensUsed ? ` · ${msg.tokensUsed.totalTokens} tokens` : ''}</span>
+                        )}
+                        {msg.provider === 'local' && (
+                          <span>🛡️ Motor Heurístico Local (Offline)</span>
+                        )}
+                        {msg.provider === 'chatgpt' && (
+                          <span>✨ IA Integrada</span>
+                        )}
                       </span>
                     )}
                     {msg.sender === 'assistant' && <span>·</span>}

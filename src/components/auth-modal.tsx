@@ -16,9 +16,19 @@ import {
   AlertCircle,
   KeyRound,
   X,
+  Building2,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase, upsertUserProfile } from '@/lib/supabase';
+import {
+  supabase,
+  upsertUserProfile,
+  loadCompanyByCode,
+  createCompanyJoinRequest,
+  createCompanyInSupabase,
+} from '@/lib/supabase';
+import { createCustomCompanyWorkspace, defaultCompanySectors } from '@/lib/ideaflow';
+import { useFlow } from '@/components/flow-provider';
 import { toast } from 'sonner';
 
 interface AuthModalProps {
@@ -29,6 +39,7 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, onClose, onSuccess, defaultMode = 'login' }: AuthModalProps) {
+  const { setData } = useFlow();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(defaultMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +51,11 @@ export function AuthModal({ open, onClose, onSuccess, defaultMode = 'login' }: A
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [forgotSent, setForgotSent] = useState(false);
+
+  // Escolha do perfil inicial ao criar conta
+  const [accountType, setAccountType] = useState<'personal' | 'join_company' | 'create_company'>('personal');
+  const [companyCode, setCompanyCode] = useState('');
+  const [newCompanyName, setNewCompanyName] = useState('');
 
   if (!open) return null;
 
@@ -115,12 +131,38 @@ export function AuthModal({ open, onClose, onSuccess, defaultMode = 'login' }: A
         setErrorMessage('As duas senhas digitadas não coincidem.');
         return;
       }
+
+      if (accountType === 'join_company') {
+        const cleanCode = companyCode.trim().toUpperCase();
+        if (!cleanCode) {
+          setErrorMessage('Informe o código da empresa fornecido pelo Key User.');
+          return;
+        }
+      }
+
+      if (accountType === 'create_company') {
+        if (!newCompanyName.trim()) {
+          setErrorMessage('Informe o nome da sua empresa / startup.');
+          return;
+        }
+      }
     }
 
     setLoading(true);
 
     try {
       if (mode === 'register') {
+        // Validação antecipada do código de empresa se for entrar com código
+        if (accountType === 'join_company') {
+          const cleanCode = companyCode.trim().toUpperCase();
+          const remoteComp = await loadCompanyByCode(cleanCode);
+          if (!remoteComp && cleanCode !== 'ACME-2026') {
+            setErrorMessage(`Código corporativo "${cleanCode}" não foi encontrado no Supabase. Verifique com seu Key User.`);
+            setLoading(false);
+            return;
+          }
+        }
+
         let authUser: any = null;
         let registerError: any = null;
 
@@ -172,14 +214,82 @@ export function AuthModal({ open, onClose, onSuccess, defaultMode = 'login' }: A
 
         if (authUser) {
           // Salva perfil inicial
+          const userRole = accountType === 'create_company' ? 'Key User & Fundador(a)' : 'Criador(a)';
           await upsertUserProfile({
             id: authUser.id,
             name: name.trim() || 'Criador(a)',
             username: username.trim().toLowerCase() || cleanEmail.split('@')[0],
-            role: 'Criador(a)',
+            role: userRole,
           }).catch(console.warn);
 
-          toast.success('Conta criada e conectada com sucesso! ✨');
+          // Configura o workspace conforme a escolha do usuário
+          if (accountType === 'create_company') {
+            const newWorkspace = createCustomCompanyWorkspace(
+              newCompanyName.trim(),
+              'Tecnologia & Inovação',
+              name.trim() || 'Key User Fundador',
+              cleanEmail,
+              authUser.id
+            );
+            await createCompanyInSupabase(newWorkspace, authUser.id);
+            setData(prev => ({
+              ...prev,
+              workspaceMode: 'business',
+              companyWorkspace: newWorkspace,
+            }));
+            toast.success(`Empresa "${newWorkspace.name}" fundada! Você é o Key User. Código: ${newWorkspace.shareCode} 👑`, { duration: 6000 });
+          } else if (accountType === 'join_company') {
+            const cleanCode = companyCode.trim().toUpperCase();
+            const remoteComp = await loadCompanyByCode(cleanCode);
+            const compId = remoteComp?.id || `comp-${cleanCode.toLowerCase().replace('-', '_')}`;
+            const compName = remoteComp?.name || `Corporação (${cleanCode})`;
+
+            await createCompanyJoinRequest({
+              id: `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              companyId: compId,
+              companyCode: cleanCode,
+              userId: authUser.id,
+              userName: name.trim() || 'Colaborador(a)',
+              userEmail: cleanEmail,
+              department: 'tech',
+              role: 'Colaborador(a)',
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+            });
+
+            setData(prev => ({
+              ...prev,
+              workspaceMode: 'business',
+              companyWorkspace: {
+                id: compId,
+                shareCode: cleanCode,
+                name: compName,
+                sectors: defaultCompanySectors,
+                members: [
+                  {
+                    id: authUser.id,
+                    name: name.trim() || 'Colaborador(a)',
+                    email: cleanEmail,
+                    role: 'Colaborador(a)',
+                    department: 'tech',
+                    isKeyUser: false,
+                    status: 'pending',
+                  },
+                ],
+                keyUserName: remoteComp?.keyUserName || 'Key User',
+                isKeyUser: false,
+              },
+            }));
+            toast.success(`Pedido de adesão enviado ao Key User de "${compName}"! 👥`, { duration: 5000 });
+          } else {
+            // Uso Pessoal / Autônomo
+            setData(prev => ({
+              ...prev,
+              workspaceMode: 'personal',
+              companyWorkspace: undefined,
+            }));
+            toast.success('Conta pessoal criada com sucesso! ✨');
+          }
 
           // O tutorial faz o tour pelo app para quem acabou de se cadastrar
           localStorage.removeItem('ideaflow_tutorial_completed');
@@ -405,6 +515,93 @@ export function AuthModal({ open, onClose, onSuccess, defaultMode = 'login' }: A
                       className="w-full bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/15 rounded-xl pl-11 pr-4 h-12 text-sm sm:text-base text-slate-900 placeholder:text-slate-400 outline-none transition-all font-mono font-medium"
                     />
                   </div>
+                </div>
+
+                {/* ESCOLHA DE OBJETIVO INICIAL (PESSOAL OU EMPRESA) */}
+                <div className="space-y-2 pt-1">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                    Como deseja começar?
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setAccountType('personal')}
+                      className={`p-2 rounded-xl text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        accountType === 'personal'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-bold'
+                          : 'text-slate-500 hover:text-slate-800 font-medium'
+                      }`}
+                    >
+                      <UserIcon size={16} className={accountType === 'personal' ? 'text-cyan-600' : ''} />
+                      <span className="text-[10px] leading-tight">Pessoal</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccountType('join_company')}
+                      className={`p-2 rounded-xl text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        accountType === 'join_company'
+                          ? 'bg-white text-slate-900 shadow-sm border border-slate-200 font-bold'
+                          : 'text-slate-500 hover:text-slate-800 font-medium'
+                      }`}
+                    >
+                      <Users size={16} className={accountType === 'join_company' ? 'text-violet-600' : ''} />
+                      <span className="text-[10px] leading-tight">Código Time</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAccountType('create_company')}
+                      className={`p-2 rounded-xl text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                        accountType === 'create_company'
+                          ? 'bg-violet-600 text-white shadow-sm font-bold'
+                          : 'text-slate-500 hover:text-slate-800 font-medium'
+                      }`}
+                    >
+                      <Building2 size={16} />
+                      <span className="text-[10px] leading-tight">Criar Empresa</span>
+                    </button>
+                  </div>
+
+                  {/* Detalhe se for Código de Time */}
+                  {accountType === 'join_company' && (
+                    <div className="p-3 rounded-xl bg-violet-50 border border-violet-200 space-y-2 animate-in fade-in-50">
+                      <label className="text-[11px] font-bold text-violet-900 block">
+                        Código da Empresa Fornecido pelo Key User *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: ACME-2026"
+                        value={companyCode}
+                        onChange={e => setCompanyCode(e.target.value.toUpperCase())}
+                        className="w-full bg-white border border-violet-300 rounded-xl px-3 py-2 text-xs font-mono font-bold tracking-wider text-slate-900 uppercase focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+                      />
+                      <p className="text-[10px] text-violet-700 leading-tight">
+                        O código será validado na nuvem e o Key User receberá seu pedido de acesso.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Detalhe se for Criar Empresa */}
+                  {accountType === 'create_company' && (
+                    <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2 animate-in fade-in-50">
+                      <label className="text-[11px] font-bold text-slate-900 block">
+                        Nome da sua Empresa / Startup *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Stark Inovações"
+                        value={newCompanyName}
+                        onChange={e => setNewCompanyName(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                      <p className="text-[10px] text-slate-600 leading-tight">
+                        Você será o <strong>Key User</strong> desta organização e receberá um código exclusivo para compartilhar com sua equipe.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </>
             )}

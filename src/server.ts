@@ -59,7 +59,7 @@ export default {
       });
     }
 
-    if (url.pathname === "/api/gemini") {
+    if (url.pathname === "/api/gemini" || url.pathname === "/api/ai") {
       if (request.method === "OPTIONS") {
         return new Response(null, {
           status: 204,

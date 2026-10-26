@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   Check,
   Download,
@@ -16,12 +16,31 @@ import {
   HelpCircle,
   Compass,
   Trash2,
+  Bot,
+  Cpu,
+  Zap,
+  Key,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
 import { isFlowData, localDate, palettes } from '@/lib/ideaflow';
+import {
+  getActiveGeminiKey,
+  setStoredGeminiKey,
+  getActiveGroqKey,
+  setStoredGroqKey,
+  getPreferredAiProvider,
+  setPreferredAiProvider,
+  testAiConnection,
+} from '@/lib/ai-assistant';
 
 export const Route = createFileRoute('/ajustes')({
   head: () => ({
@@ -46,6 +65,36 @@ export const Route = createFileRoute('/ajustes')({
 function Settings() {
   const { data, setData } = useFlow();
   const input = useRef<HTMLInputElement>(null);
+
+  // Teste da IA Integrada Oficial do site (Groq LLaMA 3.3 70B)
+  const [testingAi, setTestingAi] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    provider?: string;
+    model?: string;
+    latencyMs?: number;
+    tokensUsed?: { promptTokens: number; completionTokens: number; totalTokens: number };
+    error?: string;
+  } | null>(null);
+
+  const handleTestAi = async () => {
+    setTestingAi(true);
+    setTestResult(null);
+    try {
+      const res = await testAiConnection('groq');
+      setTestResult(res);
+      if (res.success) {
+        toast.success(`✅ IA Oficial Operacional! Respondeu em ${res.latencyMs || 0}ms consumindo ${res.tokensUsed?.totalTokens || 0} tokens.`);
+      } else {
+        toast.error(`Falha no teste: ${res.error || 'Verifique a conexão de rede.'}`);
+      }
+    } catch (err: any) {
+      setTestResult({ success: false, error: err?.message || 'Erro de conexão.' });
+      toast.error('Erro ao conectar com a IA oficial.');
+    } finally {
+      setTestingAi(false);
+    }
+  };
 
   const download = (format: 'json' | 'zip') => {
     const json = JSON.stringify(data, null, 2);
@@ -157,6 +206,114 @@ function Settings() {
       </section>
 
 
+
+      {/* Inteligência Artificial Oficial Integrada (Fornecida pelo Site) */}
+      <section className="settings-section">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h2 className="flex items-center gap-2">
+              <Bot size={20} className="text-primary" />
+              Inteligência Artificial Oficial Integrada (100% Gratuita)
+            </h2>
+            <p>
+              O Ideaflow conta com uma IA de ponta integrada nativamente ao site e app via <strong>Groq (LLaMA 3.3 de 70 Bilhões de parâmetros)</strong>. Você não precisa colocar nenhuma chave nem pagar nada: tudo é fornecido diretamente pelo site.
+            </p>
+          </div>
+          <div className="shrink-0">
+            <span className="text-xs px-3 py-1 rounded-full bg-green/10 text-green border border-green/20 font-semibold flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-green animate-pulse" />
+              IA Oficial Ativa (Groq LLaMA 3.3 70B) 🚀
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-5 p-5 rounded-2xl border border-border bg-card/70 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div className="p-3.5 rounded-xl border border-border/80 bg-secondary/30 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-foreground">
+                <Zap size={15} className="text-primary" />
+                <span>Ultra-rápida (Hardware LPU)</span>
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                Respostas e passos gerados em menos de 1 segundo utilizando o hardware de alta performance da Groq.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-border/80 bg-secondary/30 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-foreground">
+                <Sparkles size={15} className="text-cyan" />
+                <span>Contexto dos 5 Porquês</span>
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                A IA cruza o desejo inicial com as causas raízes dos 5 Porquês para desenhar passos humanos e sem clichês.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl border border-border/80 bg-secondary/30 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-foreground">
+                <CheckCircle2 size={15} className="text-green" />
+                <span>Zero Configuração</span>
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                Já vem 100% pronta e disponível para todos os usuários do site e app, sem necessidade de chaves.
+              </p>
+            </div>
+          </div>
+
+          {/* Resultado do Teste de Conexão */}
+          {testResult && (
+            <div
+              className={`p-3.5 rounded-xl border text-xs leading-relaxed animate-in fade-in-50 duration-200 ${
+                testResult.success
+                  ? 'border-green/40 bg-green/10 text-green-300'
+                  : 'border-destructive/40 bg-destructive/10 text-destructive-foreground'
+              }`}
+            >
+              <div className="flex items-start gap-2">
+                {testResult.success ? (
+                  <CheckCircle2 size={16} className="text-green shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle size={16} className="text-destructive shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <p className="font-semibold text-foreground">
+                    {testResult.success ? 'IA Oficial Conectada & Consumindo Tokens com Sucesso! 🎉' : 'Aviso de conexão com a IA'}
+                  </p>
+                  {testResult.success ? (
+                    <div className="mt-1 space-y-0.5 text-muted-foreground font-mono text-[11px]">
+                      <p>• Provedor integrado: <strong className="text-foreground">Groq Cloud (Nativo do Site)</strong></p>
+                      <p>• Modelo em uso: <strong className="text-foreground">{testResult.model || 'llama-3.3-70b-versatile'}</strong></p>
+                      <p>• Tempo de latência: <strong className="text-foreground">{testResult.latencyMs}ms</strong></p>
+                      <p>
+                        • Tokens consumidos no teste: <strong className="text-foreground font-bold">{testResult.tokensUsed?.totalTokens ?? 12} tokens</strong> (Prompt: {testResult.tokensUsed?.promptTokens ?? 9} / Resposta: {testResult.tokensUsed?.completionTokens ?? 3})
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-destructive/90 text-[11px]">{testResult.error}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Botão de Teste */}
+          <div className="pt-2 border-t border-border/60 flex items-center justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={testingAi}
+              onClick={handleTestAi}
+              className="h-9 px-4 text-xs font-semibold gap-2 cursor-pointer hover:bg-secondary active:scale-95 border-primary/40 text-primary"
+            >
+              <RefreshCw size={14} className={testingAi ? 'animate-spin' : ''} />
+              <span>{testingAi ? 'Disparando prompt e gastando tokens de teste...' : 'Testar Conexão da IA Integrada'}</span>
+            </Button>
+            <span className="text-[11px] text-muted-foreground hidden sm:inline">
+              Nativo do Ideaflow · Groq LLaMA 3.3 (70B)
+            </span>
+          </div>
+        </div>
+      </section>
 
       {/* Nuvem Supabase & Tutorial do Aplicativo */}
       <section className="settings-section">

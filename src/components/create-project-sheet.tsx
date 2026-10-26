@@ -31,9 +31,14 @@ import {
   generateSubModulesAi,
   detectSectorFromTitle,
   formatMinutes,
+  FIVE_WHYS_QUESTIONS,
+  suggestFiveWhysOffline,
+  defaultCompanySectors,
+  defaultTeamMembers,
   type Idea,
 } from '@/lib/ideaflow';
 import { generateProjectModulesWithAi, getActiveGeminiKey } from '@/lib/ai-assistant';
+import { suggestFiveWhysWithAi } from '@/lib/integrated-ai';
 import { toast } from 'sonner';
 
 interface DraftSubIdea {
@@ -53,15 +58,24 @@ interface CreateProjectSheetProps {
 export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProjectSheetProps) {
   const { data, setData } = useFlow();
 
+  const isBusiness = data.workspaceMode === 'business';
+  const activeSectors = isBusiness
+    ? (data.companyWorkspace?.sectors ?? defaultCompanySectors)
+    : data.sectors;
+  const companyMembers = data.companyWorkspace?.members ?? [];
+
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
-  const [sector, setSector] = useState(data.sectors[0]?.id ?? 'personal');
+  const [sector, setSector] = useState(activeSectors[0]?.id ?? 'tech');
   const [sectorManuallyChanged, setSectorManuallyChanged] = useState(false);
   const [priority, setPriority] = useState<Idea['priority']>('Importante');
   const [scope, setScope] = useState('');
   const [targetDate, setTargetDate] = useState('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [fiveWhys, setFiveWhys] = useState<string[]>(['', '', '', '', '']);
+  const [showFiveWhys, setShowFiveWhys] = useState(false);
+  const [suggestingWhys, setSuggestingWhys] = useState(false);
 
   // Detecção de Desktop (>= 769px) para abrir modal imersivo e amplo no Web
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
@@ -81,7 +95,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
   const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
     if (!sectorManuallyChanged && newTitle.trim().length > 3) {
-      const detected = detectSectorFromTitle(newTitle, data.sectors);
+      const detected = detectSectorFromTitle(newTitle, activeSectors);
       if (detected && detected !== sector) {
         setSector(detected);
       }
@@ -115,6 +129,8 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
     setScope('');
     setTargetDate('');
     setIsGeneratingAi(false);
+    setFiveWhys(['', '', '', '', '']);
+    setShowFiveWhys(false);
     setSubIdeas([
       {
         id: 'sub-1',
@@ -164,6 +180,29 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
     setSubIdeas(reordered);
   };
 
+  const handleSuggestWhys = async () => {
+    if (!title.trim() && !summary.trim()) {
+      toast.info('Dê um título ao projeto primeiro para sugerirmos os 5 porquês.');
+      return;
+    }
+    setSuggestingWhys(true);
+    try {
+      const suggestions = await suggestFiveWhysWithAi(`${title}. ${summary}`);
+      if (suggestions && suggestions.length > 0) {
+        setFiveWhys(suggestions);
+        setShowFiveWhys(true);
+        toast.success('5 Porquês gerados com IA! Você pode editar as respostas.');
+      }
+    } catch {
+      const offline = suggestFiveWhysOffline(`${title}. ${summary}`);
+      setFiveWhys(offline);
+      setShowFiveWhys(true);
+      toast.success('5 Porquês sugeridos com sucesso!');
+    } finally {
+      setSuggestingWhys(false);
+    }
+  };
+
   const handleGenerateAiModules = async () => {
     if (!title.trim()) {
       toast.info('Dê um título ao projeto primeiro para a IA sugerir as melhores ideias/frentes.');
@@ -172,7 +211,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
 
     setIsGeneratingAi(true);
     try {
-      const result = await generateProjectModulesWithAi(title, summary, sector);
+      const result = await generateProjectModulesWithAi(title, summary, sector, fiveWhys);
       const formatted: DraftSubIdea[] = result.modules.map(m => ({
         id: crypto.randomUUID(),
         title: m.title,
@@ -192,7 +231,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
       }
     } catch (err: any) {
       // Fallback direto
-      const fallback = generateSubModulesAi(title, summary, sector);
+      const fallback = generateSubModulesAi(title, summary, sector, fiveWhys);
       setSubIdeas(fallback.map(m => ({
         id: crypto.randomUUID(),
         title: m.title,
@@ -225,6 +264,10 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
         priority: sub.priority,
         stage: 0,
         parentId: projectId,
+        workspace: isBusiness ? 'business' : 'personal',
+        department: isBusiness
+          ? (activeSectors.find(s => s.id === sector)?.name ?? sector)
+          : undefined,
         minutes: duration,
         dedicated: 0,
         scope: `Escopo específico da frente: ${sub.title.trim()}`,
@@ -267,6 +310,11 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
       priority,
       stage: 0,
       isProject: true,
+      workspace: isBusiness ? 'business' : 'personal',
+      department: isBusiness
+        ? (activeSectors.find(s => s.id === sector)?.name ?? sector)
+        : undefined,
+      fiveWhys: fiveWhys.filter(w => w.trim()).length > 0 ? fiveWhys : undefined,
       scope:
         scope.trim() ||
         'Projeto estruturado com frentes modulares para execução clara e sem sobrecarga.',
@@ -394,7 +442,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
                       setSectorManuallyChanged(true);
                     }}
                   >
-                    {data.sectors.map(s => (
+                    {activeSectors.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>
@@ -437,6 +485,102 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
                   value={scope}
                   onChange={e => setScope(e.target.value)}
                 />
+              </div>
+
+              {/* Seção Interativa dos 5 Porquês do Projeto */}
+              <div className="rounded-xl border border-border/80 bg-secondary/35 p-3.5 transition-all">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-6 h-6 rounded-md bg-amber/15 text-amber border border-amber/30 text-xs font-bold flex items-center justify-center shrink-0">
+                      5P
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        Técnica dos 5 Porquês do Projeto
+                        <span className="text-[10.5px] font-medium px-1.5 py-0.2 rounded-full bg-secondary text-primary border border-primary/25">
+                          {fiveWhys.filter(w => w.trim()).length}/5 preenchidos
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground">
+                        Defina o propósito raiz para a IA sugerir frentes de trabalho cirúrgicas.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {title.trim().length > 3 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={suggestingWhys}
+                        className="h-7 text-[11px] px-2.5 gap-1 border-primary/40 text-primary hover:bg-primary/10 cursor-pointer shadow-xs active:scale-95"
+                        onClick={handleSuggestWhys}
+                        title="Usar IA para sugerir os 5 porquês do projeto"
+                      >
+                        <Sparkles size={11} className={suggestingWhys ? 'animate-spin' : ''} />
+                        <span>{suggestingWhys ? 'Pensando...' : 'Sugerir com IA'}</span>
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      onClick={() => setShowFiveWhys(!showFiveWhys)}
+                    >
+                      {showFiveWhys ? (
+                        <>
+                          <span>Ocultar</span>
+                          <ChevronUp size={14} className="ml-1" />
+                        </>
+                      ) : (
+                        <>
+                          <span>Abrir Perguntas ({fiveWhys.filter(w => w.trim()).length}/5)</span>
+                          <ChevronDown size={14} className="ml-1" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {showFiveWhys && (
+                  <div className="mt-3.5 space-y-3 pt-3 border-t border-border/60 animate-in fade-in-50 duration-200">
+                    {FIVE_WHYS_QUESTIONS.map((q, idx) => (
+                      <div key={q.step} className="space-y-1">
+                        <label className="text-[11px] font-medium text-foreground flex items-center justify-between">
+                          <span>
+                            <strong className="text-primary mr-1">{q.step}º Por quê:</strong>
+                            {q.question}
+                          </span>
+                        </label>
+                        <input
+                          type="text"
+                          value={fiveWhys[idx] || ''}
+                          onChange={e => {
+                            const updated = [...fiveWhys];
+                            updated[idx] = e.target.value;
+                            setFiveWhys(updated);
+                          }}
+                          placeholder={q.placeholder}
+                          className="w-full text-xs bg-background/80 border border-border rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-1">
+                      <span>💡 Dica: Ao responder os 5 porquês, a geração das frentes do projeto abaixo fica super alinhada.</span>
+                      {fiveWhys.some(w => w.trim()) && (
+                        <button
+                          type="button"
+                          onClick={() => setFiveWhys(['', '', '', '', ''])}
+                          className="text-muted-foreground hover:text-pink transition-colors cursor-pointer"
+                        >
+                          Limpar respostas
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

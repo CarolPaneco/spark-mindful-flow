@@ -16,6 +16,7 @@ import {
   Archive,
   ArchiveRestore,
   Layers,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
@@ -23,7 +24,7 @@ import { IdeaCard } from '@/components/idea-card';
 import { IdeaDetail } from '@/components/idea-detail';
 import { FocusTimer } from '@/components/focus-timer';
 import { CreateProjectSheet } from '@/components/create-project-sheet';
-import { stageNames, stageTones, type Idea } from '@/lib/ideaflow';
+import { stageNames, stageTones, defaultCompanyWorkspace, type Idea } from '@/lib/ideaflow';
 
 export const Route = createFileRoute('/')({
   head: () => ({
@@ -65,18 +66,26 @@ function Index() {
 
   const capture = () => window.dispatchEvent(new Event('ideaflow:capture'));
 
-  const activeIdeas = data.ideas.filter(i => !i.archived);
-  const archivedCount = data.ideas.filter(i => i.archived).length;
+  const isBusinessMode = data.workspaceMode === 'business';
+  const company = data.companyWorkspace;
+  const activeSectors = isBusinessMode && company ? company.sectors : data.sectors;
+
+  const workspaceIdeas = data.ideas.filter(i =>
+    isBusinessMode ? i.workspace === 'business' : i.workspace !== 'business'
+  );
+
+  const activeIdeas = workspaceIdeas.filter(i => !i.archived);
+  const archivedCount = workspaceIdeas.filter(i => i.archived).length;
   const complexProjectsCount = activeIdeas.filter(
-    i => i.isProject || data.ideas.some(sub => sub.parentId === i.id)
+    i => i.isProject || workspaceIdeas.some(sub => sub.parentId === i.id)
   ).length;
 
-  const ideas = data.ideas.filter(i => {
+  const ideas = workspaceIdeas.filter(i => {
     if (showArchived ? !i.archived : i.archived) return false;
     if (sector !== 'all' && i.sector !== sector) return false;
     if (scopeFilter === 'projects' && !i.isProject) return false;
     if (scopeFilter === 'standalone' && (i.isProject || i.parentId)) return false;
-    return `${i.title} ${i.summary}`.toLocaleLowerCase().includes(search.toLocaleLowerCase());
+    return `${i.title} ${i.summary} ${i.department ?? ''} ${i.assignedTo ?? ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase());
   });
 
   return (
@@ -88,15 +97,31 @@ function Index() {
 
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 border border-primary/25 text-primary text-[11px] font-semibold mb-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-            <Sparkles size={11} className="floating-spark text-primary" />
-            <span className="tracking-wide uppercase text-[10px]">Fluxo Criativo</span>
+            {isBusinessMode ? (
+              <Building2 size={12} className="text-violet" />
+            ) : (
+              <Sparkles size={11} className="floating-spark text-primary" />
+            )}
+            <span className="tracking-wide uppercase text-[10px]">
+              {isBusinessMode ? `Workspace Empresarial · ${company?.name ?? 'Organização'}` : 'Fluxo Criativo Pessoal'}
+            </span>
           </div>
 
           <h1>
-            Suas ideias, <span className="motion-heading-gradient">em movimento.</span>
+            {isBusinessMode ? (
+              <>
+                Sua empresa, <span className="motion-heading-gradient">em sincronia.</span>
+              </>
+            ) : (
+              <>
+                Suas ideias, <span className="motion-heading-gradient">em movimento.</span>
+              </>
+            )}
           </h1>
           <p className="page-subtitle">
-            Crie ideias individuais ou estruture projetos completos com frentes e módulos organizados.
+            {isBusinessMode
+              ? 'Gestão de iniciativas por departamentos: Tecnologia, Marketing, Testes/QA, Qualidade e Operações.'
+              : 'Crie ideias individuais ou estruture projetos completos com frentes e módulos organizados.'}
           </p>
         </div>
 
@@ -125,29 +150,37 @@ function Index() {
         </div>
       </div>
 
-      <div className="stats-bar">
-        <span>
-          <Zap className="text-cyan" />
-          <strong>{activeIdeas.length}</strong> ideias ativas
+      <div className="stats-bar flex items-center gap-3 sm:gap-6 my-6 py-2.5 px-3.5 sm:px-4 rounded-xl glass-panel border border-border/60 overflow-x-auto scrollbar-none">
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="p-1 rounded-md bg-cyan/15 text-cyan border border-cyan/25">
+            <Zap size={13} />
+          </span>
+          <span><strong>{activeIdeas.length}</strong> ativas</span>
         </span>
-        <span className="stats-divider" />
-        <span>
-          <FolderTree className="text-violet" />
-          <strong>{complexProjectsCount}</strong> projetos macro
+        <span className="stats-divider shrink-0" />
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="p-1 rounded-md bg-violet/15 text-violet border border-violet/25">
+            <FolderTree size={13} />
+          </span>
+          <span><strong>{complexProjectsCount}</strong> macro</span>
         </span>
-        <span className="stats-divider" />
-        <span>
-          <Flame className="text-pink" />
-          <strong>{activeIdeas.filter(i => i.stage === 2).length}</strong> em movimento
+        <span className="stats-divider shrink-0" />
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="p-1 rounded-md bg-pink/15 text-pink border border-pink/25">
+            <Flame size={13} />
+          </span>
+          <span><strong>{activeIdeas.filter(i => i.stage === 2).length}</strong> em ação</span>
         </span>
-        <span className="stats-divider" />
-        <span>
-          <CheckCircle2 className="text-green" />
-          <strong>{activeIdeas.filter(i => i.stage === 4).length}</strong> realizadas
+        <span className="stats-divider shrink-0" />
+        <span className="flex items-center gap-2 shrink-0">
+          <span className="p-1 rounded-md bg-green/15 text-green border border-green/25">
+            <CheckCircle2 size={13} />
+          </span>
+          <span><strong>{activeIdeas.filter(i => i.stage === 4).length}</strong> prontas</span>
         </span>
-        <span className="spark-note">
-          <Sparkles />
-          Pequenas ações. Grandes possibilidades.
+        <span className="spark-note hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground ml-auto shrink-0">
+          <Sparkles size={13} className="text-amber animate-pulse" />
+          Pequenas ações. Grandes realizações.
         </span>
       </div>
 
@@ -211,7 +244,7 @@ function Index() {
           >
             Todos os setores
           </Button>
-          {data.sectors.map(s => (
+          {activeSectors.map(s => (
             <Button
               variant="ghost"
               key={s.id}

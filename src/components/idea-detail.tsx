@@ -30,6 +30,10 @@ import {
   ChevronUp,
   ChevronDown,
   GripVertical,
+  Building2,
+  Users,
+  Tag,
+  User,
 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip, Cell, PieChart, Pie } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -48,6 +52,10 @@ import {
   getParentIdea,
   getProjectStats,
   generateSubModulesAi,
+  FIVE_WHYS_QUESTIONS,
+  suggestFiveWhysOffline,
+  defaultCompanySectors,
+  defaultTeamMembers,
   type Idea,
   type Stage,
   type Step,
@@ -56,6 +64,7 @@ import {
   type DayBlock,
 } from '@/lib/ideaflow';
 import { generateProjectModulesWithGemini } from '@/lib/ai-assistant';
+import { suggestFiveWhysWithAi } from '@/lib/integrated-ai';
 import { toast } from 'sonner';
 
 type Tab = 'overview' | 'steps' | 'subideas' | 'pivots' | 'notes' | 'calendar' | 'coach';
@@ -97,6 +106,11 @@ export function IdeaDetail({
   const [subIdeaPriority, setSubIdeaPriority] = useState<Idea['priority']>('Normal');
   const [isGeneratingSubAi, setIsGeneratingSubAi] = useState(false);
 
+  // Estados para os 5 Porquês
+  const [editingFiveWhys, setEditingFiveWhys] = useState(false);
+  const [localFiveWhys, setLocalFiveWhys] = useState<string[]>(['', '', '', '', '']);
+  const [isSuggestingWhysDetail, setIsSuggestingWhysDetail] = useState(false);
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -113,8 +127,39 @@ export function IdeaDetail({
       setShowPivotForm(false);
       setEditingStepIndex(null);
       setShowSubIdeaForm(false);
+      setEditingFiveWhys(false);
+      setLocalFiveWhys(idea.fiveWhys && idea.fiveWhys.length ? [...idea.fiveWhys] : ['', '', '', '', '']);
     }
-  }, [currentIdeaId]);
+  }, [currentIdeaId, idea?.id]);
+
+  const handleSaveFiveWhysInDetail = () => {
+    if (!idea) return;
+    const cleaned = localFiveWhys.map(w => w.trim());
+    const hasAny = cleaned.some(w => w.length > 0);
+    updateIdea(idea.id, {
+      fiveWhys: hasAny ? cleaned : undefined,
+    });
+    setEditingFiveWhys(false);
+    toast.success('5 Porquês atualizados com sucesso! 🎯');
+  };
+
+  const handleSuggestWhysInDetail = async () => {
+    if (!idea) return;
+    setIsSuggestingWhysDetail(true);
+    try {
+      const suggestions = await suggestFiveWhysWithAi(`${idea.title}. ${idea.summary}`);
+      if (suggestions && suggestions.length > 0) {
+        setLocalFiveWhys(suggestions);
+        toast.success('5 Porquês sugeridos com IA! Você pode editar as respostas.');
+      }
+    } catch {
+      const offline = suggestFiveWhysOffline(`${idea.title}. ${idea.summary}`);
+      setLocalFiveWhys(offline);
+      toast.success('5 Porquês sugeridos pelo motor reflexivo!');
+    } finally {
+      setIsSuggestingWhysDetail(false);
+    }
+  };
 
   if (!idea) {
     return (
@@ -510,6 +555,35 @@ export function IdeaDetail({
             </div>
           </div>
 
+          {/* Badges de Workspace, Setor e Responsável */}
+          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+            {idea.workspace === 'business' ? (
+              <span className="text-[11px] bg-violet/15 text-violet border border-violet/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-semibold">
+                <Building2 size={11} />
+                Workspace Empresarial
+              </span>
+            ) : (
+              <span className="text-[11px] bg-secondary/80 text-muted-foreground border border-border/80 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                <User size={11} />
+                Workspace Pessoal
+              </span>
+            )}
+
+            {idea.department && (
+              <span className="text-[11px] bg-cyan/15 text-cyan border border-cyan/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                <Tag size={11} />
+                {idea.department}
+              </span>
+            )}
+
+            {idea.assignedTo && (
+              <span className="text-[11px] bg-primary/15 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                <Users size={11} />
+                Responsável: {idea.assignedTo}
+              </span>
+            )}
+          </div>
+
           <DrawerTitle className="sheet-title mt-2">{idea.title}</DrawerTitle>
           <DrawerDescription className="mt-2 text-sm text-muted-foreground leading-relaxed">
             {idea.summary}
@@ -680,6 +754,84 @@ export function IdeaDetail({
                 </div>
               )}
 
+              {/* Card de Contexto & Atribuição de Equipe */}
+              <div className="p-4 rounded-xl border border-border/70 bg-card/70 space-y-3">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Building2 size={14} className="text-violet" />
+                  Contexto de Workspace & Atribuição
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div>
+                    <label className="text-[11px] text-muted-foreground block mb-1">Espaço / Workspace</label>
+                    <select
+                      className="text-field text-xs py-1.5 w-full"
+                      value={idea.workspace ?? 'personal'}
+                      onChange={e => {
+                        const newWs = e.target.value as 'personal' | 'business';
+                        updateIdea(idea.id, { workspace: newWs });
+                        toast.success(newWs === 'business' ? 'Movido para o Workspace da Empresa! 🏢' : 'Movido para o Espaço Pessoal 👤');
+                      }}
+                    >
+                      <option value="personal">👤 Espaço Pessoal</option>
+                      <option value="business">🏢 Workspace Empresarial</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-muted-foreground block mb-1">Setor / Departamento</label>
+                    <select
+                      className="text-field text-xs py-1.5 w-full"
+                      value={idea.sector}
+                      onChange={e => {
+                        const newSecId = e.target.value;
+                        const allSectors = [
+                          ...data.sectors,
+                          ...(data.companyWorkspace?.sectors ?? defaultCompanySectors),
+                        ];
+                        const secObj = allSectors.find(s => s.id === newSecId);
+                        updateIdea(idea.id, {
+                          sector: newSecId,
+                          department: secObj ? secObj.name : undefined,
+                        });
+                        toast.success('Setor atualizado!');
+                      }}
+                    >
+                      <optgroup label="Setores Pessoais">
+                        {data.sectors.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Departamentos da Empresa">
+                        {(data.companyWorkspace?.sectors ?? defaultCompanySectors).map(s => (
+                          <option key={`biz-${s.id}`} value={s.id}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] text-muted-foreground block mb-1">Responsável na Equipe</label>
+                    <select
+                      className="text-field text-xs py-1.5 w-full"
+                      value={idea.assignedTo ?? ''}
+                      onChange={e => {
+                        const newResp = e.target.value || undefined;
+                        updateIdea(idea.id, { assignedTo: newResp });
+                        toast.success(newResp ? `Atribuído a ${newResp}` : 'Atribuição removida');
+                      }}
+                    >
+                      <option value="">Nenhum (Livre)</option>
+                      {(data.companyWorkspace?.members ?? []).map(m => (
+                        <option key={m.id} value={m.name}>
+                          {m.name} ({m.role})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Card de Módulos para Projetos Macro */}
               {(idea.isProject || activeSubIdeas.length > 0) && (
                 <div className="p-4 rounded-xl border border-primary/30 bg-primary/5 space-y-3">
@@ -727,6 +879,111 @@ export function IdeaDetail({
                   )}
                 </div>
               )}
+
+              {/* Card dos 5 Porquês (Propósito Raiz) */}
+              <div className="p-4 rounded-xl border border-border/80 bg-card/60 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-md bg-amber/15 text-amber border border-amber/30 text-xs font-bold flex items-center justify-center shrink-0">
+                      5P
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                        Propósito Raiz: Técnica dos 5 Porquês
+                        <span className="text-[10px] text-muted-foreground font-normal">
+                          ({(idea.fiveWhys || []).filter(w => w.trim()).length}/5 respondidos)
+                        </span>
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground">
+                        A motivação profunda e os obstáculos que guiam o plano de ação desta realização.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2 gap-1 text-primary hover:bg-primary/10 cursor-pointer"
+                      onClick={() => setEditingFiveWhys(!editingFiveWhys)}
+                    >
+                      <Pencil size={12} />
+                      <span>{editingFiveWhys ? 'Fechar Edição' : (idea.fiveWhys?.length ? 'Editar Porquês' : 'Definir 5 Porquês')}</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {editingFiveWhys ? (
+                  <div className="space-y-3 pt-2 border-t border-border/60 animate-in fade-in-50 duration-200">
+                    {FIVE_WHYS_QUESTIONS.map((q, idx) => (
+                      <div key={q.step} className="space-y-1">
+                        <label className="text-[11px] font-medium text-foreground block">
+                          <strong className="text-primary mr-1">{q.step}º Por quê:</strong>
+                          {q.question}
+                        </label>
+                        <input
+                          type="text"
+                          value={localFiveWhys[idx] || ''}
+                          onChange={e => {
+                            const updated = [...localFiveWhys];
+                            updated[idx] = e.target.value;
+                            setLocalFiveWhys(updated);
+                          }}
+                          placeholder={q.placeholder}
+                          className="w-full text-xs bg-background border border-border rounded-lg px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center pt-1 flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isSuggestingWhysDetail}
+                        className="h-7 text-[11px] gap-1 text-primary border-primary/30 cursor-pointer"
+                        onClick={handleSuggestWhysInDetail}
+                      >
+                        <Sparkles size={11} className={isSuggestingWhysDetail ? 'animate-spin' : ''} />
+                        <span>{isSuggestingWhysDetail ? 'Sugerindo...' : 'Sugerir com IA'}</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-7 text-xs px-3 cursor-pointer"
+                        onClick={handleSaveFiveWhysInDetail}
+                      >
+                        <Check size={12} className="mr-1" />
+                        Salvar 5 Porquês
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    {idea.fiveWhys && idea.fiveWhys.some(w => w.trim()) ? (
+                      <div className="grid grid-cols-1 gap-2">
+                        {idea.fiveWhys.map((why, idx) => {
+                          const q = FIVE_WHYS_QUESTIONS[idx];
+                          if (!why.trim()) return null;
+                          return (
+                            <div key={idx} className="p-2.5 rounded-lg bg-secondary/40 border border-border/50 text-xs">
+                              <span className="text-[10px] font-semibold text-primary uppercase tracking-wider block mb-0.5">
+                                {idx + 1}º Por quê: {q?.question}
+                              </span>
+                              <p className="text-foreground/90 text-xs leading-relaxed">{why}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="p-3 text-center rounded-lg border border-dashed border-border/70 text-xs text-muted-foreground">
+                        Nenhum porquê registrado ainda. Clique em &ldquo;Definir 5 Porquês&rdquo; para registrar a raiz da ideia!
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               {/* Informações de Configuração da Ideia */}
               <div className="detail-fields">

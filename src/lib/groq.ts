@@ -139,27 +139,38 @@ export async function callGroqChat({
  */
 export async function planIdeaWithGroq(
   rawText: string,
-  sectors: Sector[]
+  sectors: Sector[],
+  fiveWhys?: string[]
 ): Promise<{ idea: Idea; usedGroq: boolean; error?: string }> {
   const sectorsList = sectors.map(s => `"${s.id}" (${s.name})`).join(', ');
 
-  const systemPrompt = `Você é o Ideaflow AI, um mentor prático de realização pessoal e de projetos.
-Sua missão é entender a intenção humana por trás do desejo do usuário (pode ser culinária, reforma, artesanato, família, viagens, negócios ou apps).
-Gere um plano de ação concreto, realista, humano e executável.
+  const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0) || [];
+  const whysSection = validWhys.length > 0
+    ? `\nCONTEXTO CRUCIAL E OBRIGATÓRIO DOS 5 PORQUÊS RESPONDIDOS PELO USUÁRIO:
+${validWhys.map((w, idx) => `${idx + 1}º Por quê: "${w}"`).join('\n')}
+
+ATENÇÃO RIGOROSA:
+O usuário pode ter escrito um texto breve para a ideia, mas os 5 Porquês contêm o propósito real, os obstáculos e a intenção prática.
+Cada passo em 'steps' DEVE dialogar diretamente com o que foi respondido nos 5 Porquês (ferramentas citadas, pessoas, gargalos e metas reais), resolvendo o problema no mundo real sem respostas genéricas!`
+    : '';
+
+  const systemPrompt = `Você é o Ideaflow AI, um estrategista prático de realização pessoal e de projetos.
+Sua missão é entender a intenção humana por trás do desejo do usuário unindo o texto às respostas dos 5 Porquês.
+Gere um plano de ação concreto, realista, humano, contextualizado e executável.
 Responda EXCLUSIVAMENTE um objeto JSON válido (sem tags markdown nem explicações) seguindo exatamente este formato:
 {
   "title": "Título claro, acolhedor e cativante (máx 60 caracteres)",
-  "summary": "Resumo em 1 ou 2 frases da intenção e do valor dessa realização",
+  "summary": "Resumo em 1 ou 2 frases da intenção e do valor dessa realização considerando os 5 Porquês",
   "sectorId": "Escolha o melhor ID entre: [${sectorsList}]. Para culinária, família, saúde ou rotina use 'personal'. Para marcenaria/artesanato use 'wood'. Para apps use 'tech'. Para negócios use 'business'",
   "priority": "Urgente" | "Importante" | "Normal",
-  "scope": "Definição clara do escopo do projeto (o que será feito)",
-  "immediate": "Ação imediata de 15 minutos para começar fisicamente sem desculpas",
+  "scope": "Definição clara do escopo do projeto (o que será feito na 1ª versão)",
+  "immediate": "Ação imediata de 15 minutos para começar fisicamente sem desculpas atacando o 1º Por quê",
   "clarity": "Uma frase curta de inspiração ou clareza sobre este projeto",
   "steps": [
-    { "text": "Primeiro passo específico e acionável", "minutes": 15 },
-    { "text": "Segundo passo específico e acionável", "minutes": 25 },
-    { "text": "Terceiro passo de execução principal", "minutes": 35 },
-    { "text": "Passo final de entrega, compartilhamento ou celebração", "minutes": 20 }
+    { "text": "Primeiro passo específico e acionável conectando ao 1º e 2º Por quê", "minutes": 15 },
+    { "text": "Segundo passo específico superando o obstáculo citado no 3º ou 4º Por quê", "minutes": 25 },
+    { "text": "Terceiro passo de execução principal da solução", "minutes": 35 },
+    { "text": "Passo final de entrega, validação do 5º Por quê ou celebração", "minutes": 20 }
   ]
 }`;
 
@@ -167,7 +178,7 @@ Responda EXCLUSIVAMENTE um objeto JSON válido (sem tags markdown nem explicaç�
     const responseText = await callGroqChat({
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: `Ideia do usuário: "${rawText}"` },
+        { role: 'user', content: `Ideia do usuário: "${rawText}"${whysSection}` },
       ],
       json: true,
       temperature: 0.6,
@@ -202,6 +213,7 @@ Responda EXCLUSIVAMENTE um objeto JSON válido (sem tags markdown nem explicaç�
       clarity: parsed.clarity || 'Pequenos passos constantes constroem grandes projetos.',
       steps,
       pivots: [],
+      fiveWhys: validWhys.length > 0 ? validWhys : undefined,
       notes: [
         {
           id: crypto.randomUUID(),
@@ -230,14 +242,20 @@ Responda EXCLUSIVAMENTE um objeto JSON válido (sem tags markdown nem explicaç�
 export async function generateProjectModulesWithGroq(
   projectTitle: string,
   projectSummary: string,
-  sector: string
+  sector: string,
+  fiveWhys?: string[]
 ): Promise<{ modules: { title: string; summary: string; minutes: number }[]; usedGroq: boolean; error?: string }> {
+  const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0) || [];
+  const whysSection = validWhys.length > 0
+    ? `\nContexto dos 5 Porquês do projeto:\n${validWhys.map((w, idx) => `${idx + 1}º Por quê: "${w}"`).join('\n')}`
+    : '';
+
   const prompt = `Você é o arquiteto de projetos do Ideaflow.
 Analise este PROJETO MACRO e divida-o em 3 ou 4 frentes ou módulos de desenvolvimento lógicos e acionáveis.
 O projeto pode ser de QUALQUER setor: culinária, marcenaria, reforma da casa, negócio, tecnologia ou vida pessoal.
 Projeto: "${projectTitle}"
 Resumo/Objetivo: "${projectSummary}"
-Setor: "${sector}"
+Setor: "${sector}"${whysSection}
 
 Responda EXCLUSIVAMENTE um objeto JSON válido no formato:
 {

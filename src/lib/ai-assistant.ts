@@ -1,6 +1,5 @@
 import { Idea, Sector, Step, planIdea, generateAiSteps, generateSubModulesAi } from './ideaflow';
 import {
-  getActiveGroqKey,
   callGroqChat,
   planIdeaWithGroq,
   generateProjectModulesWithGroq,
@@ -14,27 +13,39 @@ export interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
-  provider?: 'chatgpt' | 'groq' | 'gemini' | 'local';
-  suggestedActions?: string[];
+  provider?: 'gemini' | 'groq' | 'local' | 'chatgpt' | undefined;
+  model?: string | undefined;
+  tokensUsed?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  } | undefined;
+  suggestedActions?: string[] | undefined;
 }
 
-export const AI_STORAGE_KEY = 'ideaflow-gemini-key';
+export const GEMINI_STORAGE_KEY = 'ideaflow_gemini_key';
+export const GROQ_STORAGE_KEY = 'ideaflow_groq_key';
+export const PREFERRED_AI_KEY = 'ideaflow_preferred_ai';
 
-export function cleanGeminiKey(key: string): string {
+export function cleanApiKey(key: string): string {
   if (!key) return '';
   return key.trim().replace(/^Bearer\s+/i, '').replace(/^["']|["']$/g, '');
 }
 
+export function cleanGeminiKey(key: string): string {
+  return cleanApiKey(key);
+}
+
 export function getActiveGeminiKey(): string {
   if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem(AI_STORAGE_KEY);
-    if (stored && stored.trim()) return cleanGeminiKey(stored);
+    const stored = localStorage.getItem(GEMINI_STORAGE_KEY) || localStorage.getItem('ideaflow-gemini-key');
+    if (stored && stored.trim()) return cleanApiKey(stored);
   }
   const envKey =
     (import.meta as any).env?.VITE_GEMINI_API_KEY ||
-    (typeof process !== 'undefined' ? process.env?.['VITE_GEMINI_API_KEY'] : '');
+    (typeof process !== 'undefined' ? process.env?.['VITE_GEMINI_API_KEY'] || process.env?.['GEMINI_API_KEY'] : '');
   if (typeof envKey === 'string' && envKey.trim()) {
-    return cleanGeminiKey(envKey);
+    return cleanApiKey(envKey);
   }
   return '';
 }
@@ -45,12 +56,116 @@ export function getStoredGeminiKey(): string {
 
 export function setStoredGeminiKey(key: string) {
   if (typeof window === 'undefined') return;
-  const cleaned = cleanGeminiKey(key);
+  const cleaned = cleanApiKey(key);
   if (!cleaned) {
-    localStorage.removeItem(AI_STORAGE_KEY);
+    localStorage.removeItem(GEMINI_STORAGE_KEY);
+    localStorage.removeItem('ideaflow-gemini-key');
   } else {
-    localStorage.setItem(AI_STORAGE_KEY, cleaned);
+    localStorage.setItem(GEMINI_STORAGE_KEY, cleaned);
   }
+}
+
+export function getActiveGroqKey(): string {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(GROQ_STORAGE_KEY) || localStorage.getItem('ideaflow-groq-key');
+    if (stored && stored.trim()) return cleanApiKey(stored);
+  }
+  const envKey =
+    (import.meta as any).env?.VITE_GROQ_API_KEY ||
+    (typeof process !== 'undefined' ? process.env?.['VITE_GROQ_API_KEY'] || process.env?.['GROQ_API_KEY'] : '');
+  if (typeof envKey === 'string' && envKey.trim()) {
+    return cleanApiKey(envKey);
+  }
+  return '';
+}
+
+export function setStoredGroqKey(key: string) {
+  if (typeof window === 'undefined') return;
+  const cleaned = cleanApiKey(key);
+  if (!cleaned) {
+    localStorage.removeItem(GROQ_STORAGE_KEY);
+    localStorage.removeItem('ideaflow-groq-key');
+  } else {
+    localStorage.setItem(GROQ_STORAGE_KEY, cleaned);
+  }
+}
+
+export function getPreferredAiProvider(): 'gemini' | 'groq' {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(PREFERRED_AI_KEY);
+    if (stored === 'groq' || stored === 'gemini') return stored;
+  }
+  if (getActiveGeminiKey()) return 'gemini';
+  if (getActiveGroqKey()) return 'groq';
+  return 'gemini';
+}
+
+export function setPreferredAiProvider(provider: 'gemini' | 'groq') {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PREFERRED_AI_KEY, provider);
+}
+
+/**
+ * Dispara uma chamada centralizada ao endpoint de IA no backend (/api/ai ou /api/gemini).
+ */
+export async function callAiServer(payload: {
+  action: 'test' | 'plan' | 'mentor' | 'project';
+  provider?: 'gemini' | 'groq' | undefined;
+  apiKey?: string | undefined;
+  rawText?: string | undefined;
+  sectors?: Sector[] | undefined;
+  fiveWhys?: string[] | undefined;
+  message?: string | undefined;
+  contextText?: string | undefined;
+  history?: any[] | undefined;
+  projectTitle?: string | undefined;
+  projectSummary?: string | undefined;
+  sector?: string | undefined;
+}): Promise<any> {
+  const provider = payload.provider || getPreferredAiProvider();
+  const apiKey =
+    payload.apiKey || (provider === 'gemini' ? getActiveGeminiKey() : getActiveGroqKey());
+
+  const endpoints = ['/api/ai', '/api/gemini'];
+  for (const ep of endpoints) {
+    try {
+      const res = await fetch(ep, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, provider, apiKey }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.success || data.reply || data.parsed || data.modules)) {
+          return data;
+        }
+      }
+    } catch {
+      // Ignora erro e tenta próximo endpoint
+    }
+  }
+
+  // Fallback se estiver offline ou servidor sem middleware
+  return { success: false, error: 'Servidor de IA indisponível.' };
+}
+
+export async function testAiConnection(
+  provider: 'gemini' | 'groq',
+  apiKey?: string
+): Promise<{
+  success: boolean;
+  model?: string;
+  provider?: 'gemini' | 'groq';
+  tokensUsed?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  latencyMs?: number;
+  reply?: string;
+  error?: string;
+}> {
+  return callAiServer({
+    action: 'test',
+    provider,
+    apiKey,
+  });
 }
 
 /**
@@ -922,84 +1037,112 @@ ${contextText ? `Contexto atual do usuário no aplicativo: ${contextText}` : ''}
 
 /**
  * Planeja uma Ideia utilizando a melhor IA disponível:
- * 1. Groq (se chave configurada)
- * 2. Google Gemini (se chave configurada)
- * 3. Motor Cognitivo Heurístico Local (100% Offline e livre de erros)
+ * 1. Provedor Remoto Real Ativo (Google Gemini ou Groq) com consumo real de tokens
+ * 2. Motor Cognitivo Heurístico Local (100% Offline e livre de erros, rotulado explicitamente)
  */
 export async function planIdeaWithAi(
   rawText: string,
-  sectors: Sector[]
-): Promise<{ idea: Idea; provider: 'chatgpt' | 'groq' | 'gemini' | 'local'; error?: string }> {
-  // 1. Prioriza IA Integrada Oficial (OpenAI GPT-4o-mini sem precisar de chave)
-  try {
-    const { planIdeaWithIntegratedAi } = await import('./integrated-ai');
-    const sectorsList = sectors.map(s => `"${s.id}" (${s.name})`).join(', ');
-    const parsed = await planIdeaWithIntegratedAi(rawText, sectorsList);
-    if (parsed && parsed.title && Array.isArray(parsed.steps) && parsed.steps.length > 0) {
-      const matchedSector =
-        sectors.find(s => s.id === parsed.sectorId) ??
-        sectors.find(s => s.id === 'personal') ??
-        sectors[0] ?? { id: 'personal', name: 'Pessoal', tone: 'pink' as const };
+  sectors: Sector[],
+  fiveWhys?: string[]
+): Promise<{
+  idea: Idea;
+  provider: 'gemini' | 'groq' | 'local' | 'chatgpt';
+  model?: string;
+  tokensUsed?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  isLocalFallback?: boolean;
+  error?: string;
+}> {
+  const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0) || [];
+  const preferred = getPreferredAiProvider();
+  const hasGemini = Boolean(getActiveGeminiKey());
+  const hasGroq = Boolean(getActiveGroqKey());
 
-      const steps: Step[] = parsed.steps.map((s: any, idx: number) => ({
-        id: crypto.randomUUID(),
-        text: s.text || `Passo ${idx + 1}`,
-        minutes: Number(s.minutes) || 20,
-        done: false,
-      }));
-
-      const totalMinutes = steps.reduce((acc, curr) => acc + curr.minutes, 0);
-
-      const idea: Idea = {
-        id: crypto.randomUUID(),
-        title: parsed.title || rawText.slice(0, 50),
-        summary: parsed.summary || rawText,
-        sector: matchedSector.id,
-        stage: 0,
-        minutes: totalMinutes,
-        dedicated: 0,
-        priority: ['Urgente', 'Importante', 'Normal'].includes(parsed.priority) ? parsed.priority : 'Importante',
-        scope: parsed.scope || `Execução da ideia "${parsed.title}".`,
-        immediate: parsed.immediate || steps[0]?.text || 'Definir o primeiro resultado em uma frase.',
-        clarity: parsed.clarity || 'Um passo pequeno e concreto vale mais que um plano perfeito.',
-        steps,
-        pivots: [],
-        notes: [],
-      };
-
-      return { idea, provider: 'chatgpt' };
-    }
-  } catch (err: any) {
-    console.warn('IA Integrada em nuvem indisponível para planejamento, tentando Groq/Gemini:', err?.message);
-  }
-
-  // 2. Groq (se chave configurada)
-  if (isGroqActive()) {
+  if (hasGemini || hasGroq) {
+    const providerToTry = preferred === 'groq' && hasGroq ? 'groq' : (hasGemini ? 'gemini' : 'groq');
     try {
-      const groqResult = await planIdeaWithGroq(rawText, sectors);
-      if (groqResult.usedGroq && groqResult.idea) {
-        return { idea: groqResult.idea, provider: 'groq' };
+      const result = await callAiServer({
+        action: 'plan',
+        provider: providerToTry,
+        rawText,
+        sectors,
+        fiveWhys: validWhys,
+      });
+
+      if (result && result.success && result.parsed) {
+        const parsed = result.parsed;
+        const matchedSector =
+          sectors.find(s => s.id === parsed.sectorId) ??
+          sectors.find(s => s.id === 'personal') ??
+          sectors[0] ?? { id: 'personal', name: 'Pessoal', tone: 'pink' as const };
+
+        const steps: Step[] = (parsed.steps || []).map((s: any, idx: number) => ({
+          id: crypto.randomUUID(),
+          text: s.text || `Passo ${idx + 1}`,
+          minutes: Number(s.minutes) || 20,
+          done: false,
+        }));
+
+        const totalMinutes = steps.reduce((acc, curr) => acc + curr.minutes, 0);
+        const tokensTotal = result.tokensUsed?.totalTokens ?? 0;
+        const providerName = result.provider === 'gemini' ? 'Google Gemini' : 'Groq';
+
+        const idea: Idea = {
+          id: crypto.randomUUID(),
+          title: parsed.title || rawText.slice(0, 50),
+          summary: parsed.summary || rawText,
+          sector: matchedSector.id,
+          stage: 0,
+          minutes: totalMinutes,
+          dedicated: 0,
+          priority: ['Urgente', 'Importante', 'Normal'].includes(parsed.priority) ? parsed.priority : 'Normal',
+          scope: parsed.scope || `Execução da ideia "${parsed.title}".`,
+          immediate: parsed.immediate || steps[0]?.text || 'Definir o primeiro resultado em uma frase.',
+          clarity: parsed.clarity || 'Um passo pequeno e concreto vale mais que um plano perfeito.',
+          steps,
+          pivots: [],
+          fiveWhys: validWhys.length > 0 ? validWhys : undefined,
+          notes: [
+            {
+              id: crypto.randomUUID(),
+              createdAt:
+                new Date().toLocaleDateString('pt-BR') +
+                ' ' +
+                new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+              text: `Planejado com IA Real: ${providerName} (${result.model || 'LLM'}) • ${tokensTotal} tokens consumidos ⚡`,
+            },
+          ],
+        };
+
+        return {
+          idea,
+          provider: result.provider || providerToTry,
+          model: result.model,
+          tokensUsed: result.tokensUsed,
+        };
       }
     } catch (err: any) {
-      console.warn('Groq falhou no planejamento, tentando fallback:', err?.message);
+      console.warn('Falha na IA remota ao planejar:', err);
     }
   }
 
-  // 3. Google Gemini (se chave configurada)
-  if (getActiveGeminiKey()) {
-    try {
-      const geminiResult = await planIdeaWithGemini(rawText, sectors);
-      if (geminiResult.usedGemini && geminiResult.idea) {
-        return { idea: geminiResult.idea, provider: 'gemini' };
-      }
-    } catch (err: any) {
-      console.warn('Gemini falhou no planejamento, usando motor local:', err?.message);
-    }
-  }
+  // Fallback explícito: Motor Cognitivo Heurístico Local (Offline)
+  const fallback = planIdea(rawText, sectors, validWhys);
+  fallback.notes = [
+    {
+      id: crypto.randomUUID(),
+      createdAt:
+        new Date().toLocaleDateString('pt-BR') +
+        ' ' +
+        new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      text: 'Gerado com Motor Local Heurístico (Offline) 🛡️ — configure uma chave de API em Ajustes para gastar tokens com LLMs reais.',
+    },
+  ];
 
-  // 4. Motor Cognitivo Heurístico Local Especialista
-  const fallback = planIdea(rawText, sectors);
-  return { idea: fallback, provider: 'local' };
+  return {
+    idea: fallback,
+    provider: 'local',
+    isLocalFallback: true,
+  };
 }
 
 /**
@@ -1215,114 +1358,109 @@ export async function askMentorAi({
   allIdeas?: Idea[] | undefined;
   sectors?: Sector[] | undefined;
   history?: { role: 'user' | 'model'; text: string }[] | undefined;
-}): Promise<{ reply: string; provider: 'chatgpt' | 'groq' | 'gemini' | 'local'; error?: string | undefined; isNetworkBlocked?: boolean | undefined }> {
+}): Promise<{
+  reply: string;
+  provider: 'gemini' | 'groq' | 'local' | 'chatgpt';
+  model?: string;
+  tokensUsed?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  error?: string | undefined;
+  isLocalFallback?: boolean | undefined;
+  isNetworkBlocked?: boolean | undefined;
+}> {
   const contextText = generateFunnelDossier(allIdeas, sectors, contextIdea);
+  const preferred = getPreferredAiProvider();
+  const hasGemini = Boolean(getActiveGeminiKey());
+  const hasGroq = Boolean(getActiveGroqKey());
 
-  const systemPrompt = `Você é o Mentor Ideaflow Oficial, copiloto humano, acolhedor, conversacional, analítico e de alta performance de realização pessoal e de projetos.
-Seu foco é entender profundamente a pessoa por trás das ideias (seus sentimentos, medos, travas, aspirações) e ajudá-la a avançar em harmonia com sua vida.
-
-DIRETRIZES DE CONVERSAÇÃO NATURAL & CHAT:
-- Converse como um ser humano inteligente, amigável, acolhedor e atencioso, exatamente como um chat de IA moderno (estilo ChatGPT).
-- Se o usuário mandar apenas saudações ("oi", "tudo bem", "olá", "bom dia"), responda com calor humano, reciprocidade e pergunte com naturalidade como pode apoiá-lo hoje, sem empurrar processos ou passos técnicos na primeira mensagem.
-- Se o usuário expressar tristeza, depressão, desânimo, ansiedade, cansaço da vida, choro, desespero, burnout ou vulnerabilidade: PARE IMEDIATAMENTE qualquer cobrança de produtividade, seja profundamente acolhedor, diga que ele não precisa ser produtivo hoje e recomende o apoio do CVV (188 no Brasil).
-- Se o usuário perguntar sobre o funil, prioridades ou ideias específicas, estude o dossiê abaixo e cite nominalmente as ideias dele.
-- NUNCA dê respostas padronizadas, genéricas ou clichês.
-- Responda em Português do Brasil com excelente formatação markdown (listas, tópicos claros, negrito estratégico, emojis acolhedores). Não imprima asteriscos soltos.
-
-ESTUDO DO FUNIL EM TEMPO REAL:
-${contextText}`;
-
-  // 1. TENTA PRIMEIRO A IA INTEGRADA INTERNAMENTE (ESTILO CHATGPT - ZERO CHAVES NECESSÁRIAS)
-  try {
-    const aiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-      { role: 'system', content: systemPrompt },
-      ...history.map(h => ({
-        role: (h.role === 'model' ? 'assistant' : 'user') as 'assistant' | 'user',
-        content: h.text,
-      })),
-      { role: 'user', content: message },
-    ];
-
-    const chatGptReply = await callIntegratedAiChat({ messages: aiMessages, timeoutMs: 6500 });
-    if (chatGptReply) {
-      return { reply: chatGptReply, provider: 'chatgpt' };
-    }
-  } catch (err: any) {
-    console.warn('IA Integrada em nuvem indisponível (firewall/offline), ativando Motor Cognitivo Local:', err?.message);
-  }
-
-  // 2. Se o usuário tiver configurado chave própria personalizada da Groq no navegador, tenta Groq
-  const storedGroq = typeof window !== 'undefined' ? localStorage.getItem('ideaflow-groq-key') : null;
-  if (storedGroq && storedGroq.trim() && storedGroq !== DEFAULT_GROQ_KEY) {
+  // 1. TENTA PRIMEIRO A IA REMOTA REAL (COM CONSUMO REAL DE TOKENS)
+  if (hasGemini || hasGroq) {
+    const providerToTry = preferred === 'groq' && hasGroq ? 'groq' : (hasGemini ? 'gemini' : 'groq');
     try {
-      const groqMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
-        { role: 'system', content: systemPrompt },
-        ...history.map(h => ({
-          role: (h.role === 'model' ? 'assistant' : 'user') as 'assistant' | 'user',
-          content: h.text,
-        })),
-        { role: 'user' as const, content: message },
-      ];
-
-      const groqReply = await callGroqChat({
-        messages: groqMessages,
-        temperature: 0.7,
+      const result = await callAiServer({
+        action: 'mentor',
+        provider: providerToTry,
+        message,
+        contextText,
+        history,
       });
 
-      if (groqReply) {
-        return { reply: groqReply, provider: 'groq' };
+      if (result && result.success && result.reply) {
+        return {
+          reply: result.reply,
+          provider: result.provider || providerToTry,
+          model: result.model,
+          tokensUsed: result.tokensUsed,
+        };
       }
     } catch (err: any) {
-      console.warn('Groq customizado falhou, fallback:', err?.message);
+      console.warn('Erro ao consultar Mentor IA no servidor:', err?.message);
     }
   }
 
-  // 3. Fallback Infalível para o Motor Cognitivo Local Oficial (100% Offline, Seguro e Conversacional)
+  // 2. Fallback Infalível para o Motor Cognitivo Local Oficial (100% Offline, Seguro e Conversacional)
   const localReply = localAiResponse(message, contextIdea, allIdeas, sectors);
   return {
     reply: localReply,
     provider: 'local',
+    isLocalFallback: true,
   };
 }
 
 /**
  * Gera os módulos de um Projeto utilizando a melhor IA disponível:
- * 1. Groq (se chave configurada)
- * 2. Google Gemini (se chave configurada)
- * 3. Motor Cognitivo Heurístico Local (100% Offline e livre de erros)
+ * 1. Provedor Remoto Real Ativo (Google Gemini ou Groq) com consumo real de tokens
+ * 2. Motor Cognitivo Heurístico Local (100% Offline e livre de erros)
  */
 export async function generateProjectModulesWithAi(
   projectTitle: string,
   projectSummary: string,
-  sector: string
-): Promise<{ modules: { title: string; summary: string; minutes: number }[]; provider: 'groq' | 'gemini' | 'local'; error?: string }> {
-  // 1. Tenta Groq
-  if (isGroqActive()) {
-    try {
-      const groqResult = await generateProjectModulesWithGroq(projectTitle, projectSummary, sector);
-      if (groqResult.usedGroq && groqResult.modules.length > 0) {
-        return { modules: groqResult.modules, provider: 'groq' };
-      }
-    } catch (err: any) {
-      console.warn('Groq falhou em módulos de projeto, tentando fallback:', err?.message);
-    }
-  }
+  sector: string,
+  fiveWhys?: string[]
+): Promise<{
+  modules: { title: string; summary: string; minutes: number }[];
+  provider: 'gemini' | 'groq' | 'local';
+  model?: string;
+  tokensUsed?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  isLocalFallback?: boolean;
+  error?: string;
+}> {
+  const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0) || [];
+  const preferred = getPreferredAiProvider();
+  const hasGemini = Boolean(getActiveGeminiKey());
+  const hasGroq = Boolean(getActiveGroqKey());
 
-  // 2. Tenta Gemini
-  if (getActiveGeminiKey()) {
+  if (hasGemini || hasGroq) {
+    const providerToTry = preferred === 'groq' && hasGroq ? 'groq' : (hasGemini ? 'gemini' : 'groq');
     try {
-      const geminiResult = await generateProjectModulesWithGemini(projectTitle, projectSummary, sector);
-      if (geminiResult.usedGemini && geminiResult.modules.length > 0) {
-        return { modules: geminiResult.modules, provider: 'gemini' };
+      const result = await callAiServer({
+        action: 'project',
+        provider: providerToTry,
+        projectTitle,
+        projectSummary,
+        sector,
+        fiveWhys: validWhys,
+      });
+
+      if (result && result.success && Array.isArray(result.modules) && result.modules.length > 0) {
+        return {
+          modules: result.modules,
+          provider: result.provider || providerToTry,
+          model: result.model,
+          tokensUsed: result.tokensUsed,
+        };
       }
     } catch (err: any) {
-      console.warn('Gemini falhou em módulos de projeto, usando motor local:', err?.message);
+      console.warn('Falha ao gerar módulos via IA remota:', err?.message);
     }
   }
 
   // 3. Motor Local Seguro
-  const fallback = generateSubModulesAi(projectTitle, projectSummary, sector);
-  return { modules: fallback, provider: 'local' };
+  const fallback = generateSubModulesAi(projectTitle, projectSummary, sector, validWhys);
+  return {
+    modules: fallback,
+    provider: 'local',
+    isLocalFallback: true,
+  };
 }
 
 /**

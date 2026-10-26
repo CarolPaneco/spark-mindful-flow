@@ -130,9 +130,14 @@ function Sectors() {
     setMounted(true);
   }, []);
 
-  const activeIdeas = data.ideas.filter(i => !i.archived);
-  const comparison = calculateGlobalSectorComparison(data.sectors, activeIdeas);
-  const selectedSector = data.sectors.find(s => s.id === selected);
+  const isBusiness = data.workspaceMode === 'business';
+  const company = data.companyWorkspace;
+  const currentSectors = isBusiness && company ? company.sectors : data.sectors;
+  const workspaceIdeas = data.ideas.filter(i => isBusiness ? i.workspace === 'business' : i.workspace !== 'business');
+
+  const activeIdeas = workspaceIdeas.filter(i => !i.archived);
+  const comparison = calculateGlobalSectorComparison(currentSectors, activeIdeas);
+  const selectedSector = selected ? (currentSectors.find(s => s.id === selected) ?? null) : null;
   const selectedAnalytics = selectedSector
     ? calculateSectorAnalytics(selectedSector, activeIdeas)
     : null;
@@ -141,7 +146,7 @@ function Sectors() {
   const openDeleteModal = (sec: Sector, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setDeletingSector(sec);
-    const otherSectors = data.sectors.filter(s => s.id !== sec.id);
+    const otherSectors = currentSectors.filter(s => s.id !== sec.id);
     setReassignSectorId(otherSectors[0]?.id || '');
   };
 
@@ -512,16 +517,18 @@ function Sectors() {
           {/* Grid de Todos os Setores com Ações de Editar e Excluir */}
           <section className="mt-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="section-heading">Explorar Setores</h2>
+              <h2 className="section-heading">
+                {isBusiness && company ? `Setores de ${company.name}` : 'Explorar Setores'}
+              </h2>
               <span className="text-xs text-muted-foreground font-mono">
-                {data.sectors.length} setor(es) ativo(s)
+                {currentSectors.length} setor(es) ativo(s)
               </span>
             </div>
 
             <div className="sectors-grid">
-              {data.sectors.map(s => {
+              {currentSectors.map(s => {
                 const Icon = getSectorIcon(s.id, s.name);
-                const ideas = data.ideas.filter(i => i.sector === s.id);
+                const ideas = workspaceIdeas.filter(i => i.sector === s.id);
                 const done = ideas.filter(i => i.stage === 4).length;
                 const minutes = ideas.reduce((sum, i) => sum + i.dedicated, 0);
 
@@ -934,7 +941,7 @@ function Sectors() {
 
       {/* 6. DASHBOARD EXCLUSIVO DO SETOR SELECIONADO */}
       <Drawer
-        open={Boolean(selectedSector)}
+        open={Boolean(selected && selectedSector)}
         onOpenChange={v => {
           if (!v) setSelected(null);
         }}
@@ -949,17 +956,28 @@ function Sectors() {
                     <Sparkles size={14} />
                     DASHBOARD EXCLUSIVO DO SETOR
                   </div>
-                  <span
-                    className={`text-xs px-2.5 py-0.5 rounded-full border ${
-                      selectedAnalytics.healthStatus === 'Em Alta'
-                        ? 'border-green/40 text-green bg-green/10'
-                        : selectedAnalytics.healthStatus === 'Em Atraso'
-                          ? 'border-pink/40 text-pink bg-pink/10'
-                          : 'border-primary/40 text-primary bg-primary/10'
-                    }`}
-                  >
-                    {selectedAnalytics.healthStatus}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs px-2.5 py-0.5 rounded-full border ${
+                        selectedAnalytics.healthStatus === 'Em Alta'
+                          ? 'border-green/40 text-green bg-green/10'
+                          : selectedAnalytics.healthStatus === 'Em Atraso'
+                            ? 'border-pink/40 text-pink bg-pink/10'
+                            : 'border-primary/40 text-primary bg-primary/10'
+                      }`}
+                    >
+                      {selectedAnalytics.healthStatus}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSelected(null)}
+                      className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors"
+                      title="Fechar (Esc)"
+                      aria-label="Fechar"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between flex-wrap gap-3">
@@ -1087,6 +1105,19 @@ function Sectors() {
                       </p>
                     )}
                   </div>
+                </div>
+
+                {/* Botão de Fechar no Rodapé */}
+                <div className="pt-4 border-t border-border flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 cursor-pointer"
+                    onClick={() => setSelected(null)}
+                  >
+                    <X size={14} />
+                    Fechar Painel do Setor
+                  </Button>
                 </div>
               </>
             )}

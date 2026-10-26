@@ -53,6 +53,52 @@ export interface Idea {
   isProject?: boolean | undefined; // Se esta ideia é um projeto macro com sub-módulos
   archived?: boolean | undefined; // Se esta ideia foi arquivada
   archivedAt?: string | undefined; // Data do arquivamento
+  fiveWhys?: string[] | undefined; // Respostas da técnica dos 5 Porquês para contextualizar a IA
+  workspace?: 'personal' | 'business' | undefined; // Contexto: pessoal ou empresarial
+  companyId?: string | undefined; // ID da empresa compartilhada para sincronização entre membros
+  assignedTo?: string | undefined; // Responsável pela iniciativa na equipe
+  department?: string | undefined; // Setor ou departamento empresarial
+}
+
+export type WorkspaceType = 'personal' | 'business';
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  email?: string | undefined;
+  avatar?: string | undefined;
+  department?: string | undefined; // id do setor
+  isKeyUser?: boolean | undefined; // Se é o Key User / Administrador da empresa
+  status?: ('active' | 'pending') | undefined;
+}
+
+export interface CompanyJoinRequest {
+  id: string;
+  companyId: string;
+  companyCode: string;
+  userId?: string | undefined;
+  userName: string;
+  userEmail: string;
+  department: string;
+  role: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+}
+
+export interface CompanyWorkspace {
+  id?: string | undefined;
+  shareCode?: string | undefined;
+  name: string;
+  industry?: string;
+  mission?: string;
+  sectors: Sector[];
+  members: TeamMember[];
+  ownerId?: string | undefined;
+  keyUserName?: string | undefined;
+  keyUserEmail?: string | undefined;
+  isKeyUser?: boolean | undefined;
+  pendingRequests?: CompanyJoinRequest[] | undefined;
 }
 
 export interface UserProfile {
@@ -60,6 +106,7 @@ export interface UserProfile {
   role: string;
   bio?: string | undefined;
   streak: number;
+  personalPin?: string | undefined; // Senha de 4 dígitos para proteger o espaço pessoal
 }
 
 export interface FlowData {
@@ -68,6 +115,8 @@ export interface FlowData {
   theme: 'dark' | 'light';
   palette: string;
   profile?: UserProfile | undefined;
+  workspaceMode?: WorkspaceType | undefined;
+  companyWorkspace?: CompanyWorkspace | undefined;
 }
 
 export const stageNames = ['Faísca', 'Estrutura', 'Em Fluxo', 'Ajustes', 'Realidade'];
@@ -79,6 +128,269 @@ export const initialSectors: Sector[] = [
   { id: 'business', name: 'Negócios', tone: 'violet' },
   { id: 'personal', name: 'Vida pessoal', tone: 'pink' },
 ];
+
+export const defaultCompanySectors: Sector[] = [
+  { id: 'tech', name: 'Tecnologia & Dev', tone: 'cyan' },
+  { id: 'marketing', name: 'Marketing & Growth', tone: 'pink' },
+  { id: 'qa', name: 'Testes & QA', tone: 'amber' },
+  { id: 'quality', name: 'Qualidade & Produto', tone: 'green' },
+  { id: 'ops', name: 'Operações & RH', tone: 'violet' },
+];
+
+export const defaultTeamMembers: TeamMember[] = [
+  { id: 'member-1', name: 'Você (Líder / Admin)', role: 'Product Leader & Founder', email: 'lider@empresa.com', department: 'quality' },
+  { id: 'member-2', name: 'Beatriz Costa', role: 'Tech Lead / Dev Fullstack', email: 'beatriz@empresa.com', department: 'tech' },
+  { id: 'member-3', name: 'Marina Silva', role: 'Head de Marketing & Growth', email: 'marina@empresa.com', department: 'marketing' },
+  { id: 'member-4', name: 'Lucas Rocha', role: 'Engenheiro de QA & Testes', email: 'lucas@empresa.com', department: 'qa' },
+];
+
+export const defaultCompanyWorkspace: CompanyWorkspace = {
+  id: 'comp-acme-corp',
+  shareCode: 'ACME-2026',
+  name: 'Acme Inovações S.A.',
+  industry: 'Tecnologia & Serviços Digitais',
+  mission: 'Construir produtos ágeis, estáveis e com excelência contínua para nossos clientes.',
+  sectors: defaultCompanySectors,
+  members: defaultTeamMembers,
+  keyUserName: 'Você (Líder / Admin)',
+  isKeyUser: true,
+  pendingRequests: [],
+};
+
+export function generateCompanyCode(name: string): string {
+  const clean = name.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  const prefix = (clean.slice(0, 4) || 'CORP').padEnd(4, 'X');
+  const year = new Date().getFullYear();
+  const random = Math.floor(100 + Math.random() * 900);
+  return `${prefix}-${random}`;
+}
+
+export function createCustomCompanyWorkspace(
+  name: string,
+  industry: string,
+  keyUserName: string,
+  keyUserEmail?: string,
+  userId?: string
+): CompanyWorkspace {
+  const shareCode = generateCompanyCode(name);
+  const companyId = `comp-${shareCode.toLowerCase().replace('-', '_')}`;
+  return {
+    id: companyId,
+    shareCode,
+    name: name.trim() || 'Nova Corporação',
+    industry: industry.trim() || 'Tecnologia & Inovação',
+    mission: 'Alinhar times, escalar resultados e transformar grandes metas em entregas reais.',
+    sectors: defaultCompanySectors,
+    members: [
+      {
+        id: userId || `member-${Date.now()}`,
+        name: keyUserName.trim() || 'Key User Fundador',
+        role: 'Key User & Diretor(a)',
+        email: keyUserEmail || 'admin@empresa.com',
+        department: 'quality',
+        isKeyUser: true,
+        status: 'active',
+      },
+    ],
+    ownerId: userId,
+    keyUserName: keyUserName.trim() || 'Key User Fundador',
+    keyUserEmail,
+    isKeyUser: true,
+    pendingRequests: [],
+  };
+}
+
+export function createStarterBusinessIdeas(): Idea[] {
+  return [
+    {
+      id: 'biz-1',
+      title: 'Pipeline CI/CD Automatizado & Testes de Regressão',
+      summary: 'Garantir que novos deploys passem por bateria de testes automatizados com taxa de falha zero.',
+      sector: 'qa',
+      workspace: 'business',
+      department: 'Testes & QA',
+      assignedTo: 'Lucas Rocha',
+      stage: 2,
+      minutes: 180,
+      dedicated: 90,
+      priority: 'Urgente',
+      scope: 'Configurar suites no GitHub Actions com relatório de cobertura e alertas automáticos.',
+      immediate: 'Escrever casos de teste ponta a ponta para o fluxo de checkout e login.',
+      clarity: 'Qualidade contínua reduz chamados de suporte em 40%.',
+      steps: [
+        { id: 'biz-1-s1', text: 'Mapear fluxos críticos e casos de teste prioritários', minutes: 40, done: true },
+        { id: 'biz-1-s2', text: 'Configurar execução paralela no pipeline de CI', minutes: 50, done: true },
+        { id: 'biz-1-s3', text: 'Integrar testes de carga e monitoramento de latência', minutes: 50, done: false },
+        { id: 'biz-1-s4', text: 'Apresentar métricas de estabilidade para a diretoria', minutes: 40, done: false },
+      ],
+      fiveWhys: [
+        'Evitar que bugs cheguem a clientes corporativos em produção.',
+        'Houve 2 incidentes no último trimestre que poderiam ser pegos no build.',
+        'Não tínhamos uma esteira de QA automatizada antes de cada merge.',
+        'Aumenta a confiança dos clientes e reduz estresse da equipe de plantão.',
+        'Começar pelos fluxos de pagamento e autenticação resolve 80% do risco.',
+      ],
+    },
+    {
+      id: 'biz-2',
+      title: 'Campanha de Aquisição B2B via Conteúdo & Inbound',
+      summary: 'Estruturar funil de inbound marketing com webinars e cases de clientes para gerar 50 MQLs/mês.',
+      sector: 'marketing',
+      workspace: 'business',
+      department: 'Marketing & Growth',
+      assignedTo: 'Marina Silva',
+      stage: 1,
+      minutes: 120,
+      dedicated: 30,
+      priority: 'Importante',
+      scope: 'Lançar landing page de materiais ricos e sequência de e-mails segmentada.',
+      immediate: 'Gravar primeiro case de sucesso em vídeo com depoimento do cliente Alpha.',
+      clarity: 'Aquisição orientada a autoridade atrai leads com ticket médio 3x maior.',
+      steps: [
+        { id: 'biz-2-s1', text: 'Roteirizar entrevista com cliente Alpha', minutes: 30, done: true },
+        { id: 'biz-2-s2', text: 'Publicar landing page de captação de leads', minutes: 30, done: false },
+        { id: 'biz-2-s3', text: 'Ativar campanhas de distribuição no LinkedIn Ads', minutes: 30, done: false },
+        { id: 'biz-2-s4', text: 'Conectar leads ao CRM comercial para nutrição', minutes: 30, done: false },
+      ],
+      fiveWhys: [
+        'Aumentar o faturamento da empresa com clientes corporativos recorrentes.',
+        'A base atual depende de indicações e precisa de previsibilidade.',
+        'Ainda não tínhamos uma estratégia de conteúdo estruturada com prova social.',
+        'Permite a empresa contratar mais talentos e acelerar desenvolvimento de produto.',
+        'Provas sociais reais geram credibilidade imediata com baixo custo por aquisição.',
+      ],
+    },
+    {
+      id: 'biz-3',
+      title: 'Manual de Boas Práticas & Certificação de Qualidade Interna',
+      summary: 'Padronizar critérios de aceite, code review e auditoria de acessibilidade para toda a engenharia.',
+      sector: 'quality',
+      workspace: 'business',
+      department: 'Qualidade & Produto',
+      assignedTo: 'Você (Líder / Admin)',
+      stage: 3,
+      minutes: 150,
+      dedicated: 120,
+      priority: 'Importante',
+      scope: 'Documentar checklist de definição de pronto (DoD) e guia de acessibilidade WCAG 2.1.',
+      immediate: 'Finalizar revisão do checklist e treinar líderes técnicos dos esquadrões.',
+      clarity: 'Processos claros evitam retrabalho e alinham expectativas entre equipes.',
+      steps: [
+        { id: 'biz-3-s1', text: 'Compilar diretrizes de acessibilidade e segurança', minutes: 40, done: true },
+        { id: 'biz-3-s2', text: 'Validar checklist com os líderes de Tecnologia e QA', minutes: 40, done: true },
+        { id: 'biz-3-s3', text: 'Publicar documentação na base de conhecimento interna', minutes: 40, done: true },
+        { id: 'biz-3-s4', text: 'Rodar auditoria piloto no sprint corrente', minutes: 30, done: false },
+      ],
+    },
+    {
+      id: 'biz-4',
+      title: 'Refatoração da Arquitetura para Alta Disponibilidade',
+      summary: 'Modernizar microsserviços de mensageria com cache Redis e failover automático.',
+      sector: 'tech',
+      workspace: 'business',
+      department: 'Tecnologia & Dev',
+      assignedTo: 'Beatriz Costa',
+      stage: 0,
+      minutes: 240,
+      dedicated: 0,
+      priority: 'Urgente',
+      scope: 'Reduzir latência de resposta de 350ms para menos de 60ms sob picos de acesso.',
+      immediate: 'Benchmark das rotas de banco de dados e identificar gargalos de I/O.',
+      clarity: 'Sistemas rápidos retêm clientes e viabilizam contratos de SLA corporativo.',
+      steps: [
+        { id: 'biz-4-s1', text: 'Benchmark das rotas de banco de dados e gargalos', minutes: 60, done: false },
+        { id: 'biz-4-s2', text: 'Implementar camada de cache em memória', minutes: 60, done: false },
+        { id: 'biz-4-s3', text: 'Configurar réplica de leitura e failover', minutes: 60, done: false },
+        { id: 'biz-4-s4', text: 'Executar teste de estresse simulando 10k requisições/s', minutes: 60, done: false },
+      ],
+    },
+  ];
+}
+
+export const FIVE_WHYS_QUESTIONS = [
+  {
+    step: 1,
+    title: '1º Por quê: O Objetivo Raiz',
+    question: 'Por que você quer realizar essa ideia ou projeto?',
+    placeholder: 'Ex: Para resolver a dor X ou criar uma nova fonte de renda/hábito...',
+  },
+  {
+    step: 2,
+    title: '2º Por quê: A Necessidade Atual',
+    question: 'Por que isso é importante ou prioridade agora?',
+    placeholder: 'Ex: Porque o momento exige mudança ou a oportunidade surgiu agora...',
+  },
+  {
+    step: 3,
+    title: '3º Por quê: O Obstáculo Central',
+    question: 'Por que isso ainda não foi feito ou qual é o maior desafio?',
+    placeholder: 'Ex: Porque faltava clareza de passos práticos, tempo ou recurso...',
+  },
+  {
+    step: 4,
+    title: '4º Por quê: O Impacto Real',
+    question: 'Por que o sucesso dessa ideia fará diferença de verdade?',
+    placeholder: 'Ex: Vai gerar autonomia, realização pessoal ou ajudar clientes...',
+  },
+  {
+    step: 5,
+    title: '5º Por quê: A Escolha do Formato',
+    question: 'Por que essa abordagem simples é o melhor ponto de partida?',
+    placeholder: 'Ex: Porque começar pequeno valida a ideia com rapidez e baixo risco...',
+  },
+] as const;
+
+export function suggestFiveWhysOffline(titleOrText: string): string[] {
+  const lower = (titleOrText || '').toLowerCase();
+
+  if (/bolo|receita|culin|cozinh|doce|pão|restaurante|café|comida/.test(lower)) {
+    return [
+      'Compartilhar sabor e carinho com um produto gastronômico autêntico e de alta qualidade.',
+      'Existe uma demanda crescente por alimentos caseiros, artesanais e frescos.',
+      'Ainda não havia testado a receita padronizada nem definido as embalagens e porções certas.',
+      'Traz realização pessoal imediata e pode se transformar em uma fonte de renda deliciosa.',
+      'Começar com fornadas pequenas sob encomenda valida o sabor e os clientes sem desperdício.',
+    ];
+  }
+
+  if (/app|site|software|bot|api|saas|plataforma|sistema|código|dev/.test(lower)) {
+    return [
+      'Resolver um problema real de organização ou produtividade de forma intuitiva e sem atrito.',
+      'Usuários perdem horas com ferramentas burocráticas e buscam soluções leves e focadas.',
+      'Faltava definir um MVP enxuto para não cair na armadilha do perfeccionismo ou complexidade.',
+      'Criar um produto escalável com impacto direto no dia a dia das pessoas.',
+      'Lançar uma versão funcional inicial valida o interesse antes de escrever código desnecessário.',
+    ];
+  }
+
+  if (/venda|negócio|loja|cliente|empresa|monetiz|renda|consultoria|curso/.test(lower)) {
+    return [
+      'Construir uma oferta com valor claro que transforme uma competência em receita previsível.',
+      'O mercado está receptivo e preciso diversificar minhas fontes de faturamento agora.',
+      'Faltava empacotar a proposta em uma oferta irresistível e abordar os primeiros clientes.',
+      'Gera sustentabilidade financeira, independência e impacto comercial comprovado.',
+      'Validar primeiro com 3 a 5 contatos próximos garante tração com custo quase zero.',
+    ];
+  }
+
+  if (/reforma|casa|quarto|apartamento|marcenaria|móvel|jardim|obra/.test(lower)) {
+    return [
+      'Tornar o espaço mais agradável, funcional e acolhedor para o dia a dia.',
+      'O ambiente atual está gerando desconforto ou desordem na rotina.',
+      'Faltava listar as medidas, materiais necessários e definir um cronograma por etapas.',
+      'Um espaço bem cuidado melhora o bem-estar mental, foco e convivência diária.',
+      'Dividir em etapas (planejamento, materiais e montagem) evita frustração e custos extras.',
+    ];
+  }
+
+  return [
+    'Transformar essa inspiração em algo concreto e visível no mundo real.',
+    'É o momento certo para tirar da cabeça antes que a rotina faça a ideia se perder.',
+    'Faltava um método claro para quebrar a meta em passos executáveis de 15 a 30 minutos.',
+    'Traz sensação de progresso real, propósito ativo e evolução pessoal.',
+    'Dar o primeiro passo simples reduz o medo de errar e cria tração imediata.',
+  ];
+}
 
 const makeIdea = (
   id: string,
@@ -305,6 +617,8 @@ export const seedData = (withDemos = false): FlowData => {
       bio: 'Transformando ideias em realidade, um passo consciente de cada vez.',
       streak: 6,
     },
+    workspaceMode: 'personal',
+    companyWorkspace: undefined,
     sectors: withDemos ? initialSectors.map(s => ({ ...s })) : [],
     ideas: withDemos ? demoIdeas : [],
   };
@@ -329,394 +643,186 @@ export function generateAiSteps(
   title: string,
   summary: string,
   sectorId: string,
-  style: 'mvp' | 'rapido' | 'estruturado' | 'expansao' = 'estruturado'
+  style: 'mvp' | 'rapido' | 'estruturado' | 'expansao' = 'estruturado',
+  fiveWhys?: string[]
 ): Step[] {
   const lower = `${title} ${summary}`.toLowerCase();
+  const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0) || [];
+  const cleanTitle = (title.trim() || 'Nova Ideia').slice(0, 45);
 
-  if (style === 'mvp') {
+  const isMedia = /vlog|video|vídeo|youtube|show|bts|música|musica|banda|viagem|viajar|aeroporto|grava|foto|podcast|filma|conteudo|conteúdo|reels|tiktok|cinema|ensaio|kpop/i.test(lower);
+  const isCooking = /bolo|receita|cenoura|cozinha|almoço|jantar|comida|avó|avô|visita|família|aniversário|sobremesa|pão|doce|culinár/i.test(lower);
+  const isWriting = /livro|leitura|ler|escrever|capítulo|ebook|artigo|texto|redigir|poema|roteiro/i.test(lower);
+  const isWood = sectorId === 'wood' || /marcenaria|madeira|móvel|físico|oficina|artesanato|projeto|ferramenta/i.test(lower);
+  const isTravel = !isMedia && /viagem|viajar|férias|passeio|hotel|passagem|roteiro|mala/i.test(lower);
+  const isFitness = /correr|corrida|treino|academia|exercício|saúde|peso|dieta|hábito|meditar|alongar|sono/i.test(lower);
+  const isFinance = /dinheiro|finança|economizar|investir|gasto|orçamento|dívida|reserva/i.test(lower);
+  const isStudy = /estudar|curso|aprender|certificação|faculdade|idioma|inglês|prova/i.test(lower);
+  const isTech = sectorId === 'tech' || /app|site|software|código|codigo|api|banco|web|frontend|backend|plataforma|sistema|saas|computador|program/i.test(lower);
+  const isBusiness = sectorId === 'business' || /venda|cliente|preço|preco|loja|marketing|negócio|negocio|lançar|lancar|empresa|monetiz|comercial/i.test(lower);
+
+  const why1 = validWhys[0] || '';
+  const why3 = validWhys[2] || validWhys[1] || '';
+  const why5 = validWhys[4] || validWhys[3] || '';
+
+  // 1. MÍDIA, VLOG, SHOW, CONTEÚDO, EVENTOS
+  if (isMedia) {
+    if (style === 'mvp') {
+      return [
+        { id: crypto.randomUUID(), text: why1 ? `Roteirizar os momentos indispensáveis do vlog de “${cleanTitle}” com foco em: ${why1.slice(0, 50)}` : `Roteirizar os 4 momentos indispensáveis do vlog de “${cleanTitle}” (aeroporto, chegada, show e bastidores)`, minutes: 15, done: false },
+        { id: crypto.randomUUID(), text: `Checar baterias extras, microfone e memória livre no celular ou câmera`, minutes: 15, done: false },
+        { id: crypto.randomUUID(), text: why3 ? `Gravar tomadas do trajeto e abertura espontânea superando: “${why3.slice(0, 50)}”` : `Gravar as tomadas-chave do trajeto e abertura espontânea contando a expectativa`, minutes: 30, done: false },
+        { id: crypto.randomUUID(), text: why5 ? `Decupar clipes gravados e fazer primeiro corte rápido visando: “${why5.slice(0, 50)}”` : `Decupar os melhores clipes gravados e fazer um primeiro corte rápido e dinâmico`, minutes: 20, done: false },
+      ];
+    }
+    if (style === 'rapido') {
+      return [
+        { id: crypto.randomUUID(), text: `Anotar 3 ideias de cenas criativas no aeroporto e durante o show`, minutes: 10, done: false },
+        { id: crypto.randomUUID(), text: `Configurar estabilização e resolução de vídeo no aplicativo de gravação`, minutes: 10, done: false },
+        { id: crypto.randomUUID(), text: `Gravar tomada rápida de 1 minuto expressando a empolgação da viagem`, minutes: 10, done: false },
+      ];
+    }
+    if (style === 'expansao') {
+      return [
+        { id: crypto.randomUUID(), text: `Cortar os 3 melhores trechos do show/viagem em formato Shorts/Reels/TikTok`, minutes: 25, done: false },
+        { id: crypto.randomUUID(), text: `Criar miniatura atraente e publicar o vlog com tags, capítulos e descrição`, minutes: 20, done: false },
+        { id: crypto.randomUUID(), text: `Interagir com comentários e comunidades de fãs do evento`, minutes: 15, done: false },
+      ];
+    }
     return [
-      {
-        id: crypto.randomUUID(),
-        text: `Definir a promessa central de “${title.slice(0, 35)}” em 1 frase`,
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Construir a versão mais simples possível (rascunho/mockup)',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Apresentar para 1 pessoa real do público-alvo',
-        minutes: 20,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Coletar o aprendizado e decidir se avança ou ajusta rota',
-        minutes: 15,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: `Definir a narrativa visual e checklist de tomadas da viagem ao show`, minutes: 20, done: false },
+      { id: crypto.randomUUID(), text: `Preparar kit de gravação (baterias carregadas, áudio limpo e backup)`, minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: `Capturar cenas do aeroporto, trajeto, público e o ápice do show`, minutes: 40, done: false },
+      { id: crypto.randomUUID(), text: `Montar linha do tempo da edição com cortes dinâmicos e trilha sonora`, minutes: 35, done: false },
+      { id: crypto.randomUUID(), text: `Finalizar cor, calibrar áudio e exportar o vlog completo em alta resolução`, minutes: 20, done: false },
     ];
   }
 
-  if (style === 'rapido') {
+  // 2. CULINÁRIA E COZINHA
+  if (isCooking) {
+    if (style === 'mvp' || style === 'rapido') {
+      return [
+        { id: crypto.randomUUID(), text: `Conferir os ingredientes na despensa e anotar o que falta comprar`, minutes: 10, done: false },
+        { id: crypto.randomUUID(), text: `Adquirir os itens frescos que faltam e separar utensílios`, minutes: 20, done: false },
+        { id: crypto.randomUUID(), text: `Executar a receita no modo prático e acompanhar o tempo de forno`, minutes: 35, done: false },
+        { id: crypto.randomUUID(), text: `Servir ou degustar a primeira porção fresca e avaliar o sabor`, minutes: 15, done: false },
+      ];
+    }
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Escrever o resultado esperado no papel em 5 tópicos',
-        minutes: 10,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Separar materiais e eliminar distrações da mesa',
-        minutes: 10,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Trabalhar em foco ininterrupto no núcleo da ideia',
-        minutes: 25,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Registrar o progresso e definir o próximo compromisso',
-        minutes: 10,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: 'Conferir os ingredientes na despensa e anotar o que falta comprar', minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Ir ao mercado e adquirir os itens frescos e a embalagem', minutes: 25, done: false },
+      { id: crypto.randomUUID(), text: 'Executar o preparo e acompanhar o tempo de forno com atenção', minutes: 45, done: false },
+      { id: crypto.randomUUID(), text: 'Finalizar a montagem/decoração e servir ou entregar com carinho', minutes: 20, done: false },
     ];
   }
 
-  if (style === 'expansao') {
+  // 3. MARCENARIA E OFICINA
+  if (isWood) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Mapear canais de divulgação e parceiros potenciais',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Automatizar tarefas repetitivas ou criar templates',
-        minutes: 45,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Medir métricas de engajamento e satisfação dos usuários',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Planejar a próxima iteração com base nos dados reais',
-        minutes: 30,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: `Desenhar esboço com medidas finais de “${cleanTitle}” e lista de cortes`, minutes: 25, done: false },
+      { id: crypto.randomUUID(), text: 'Verificar ferramentas, insumos e separar o material bruto', minutes: 30, done: false },
+      { id: crypto.randomUUID(), text: 'Executar cortes principais, usinagem e pré-montagem', minutes: 50, done: false },
+      { id: crypto.randomUUID(), text: 'Lixamento progressivo, aplicação de acabamento e montagem final', minutes: 35, done: false },
     ];
   }
 
-  // Estilo Estruturado por setor / contexto
-  if (sectorId === 'tech' || /app|site|software|código|api|banco|web|frontend|backend/.test(lower)) {
+  // 4. LIVROS, ESCRITA E ARTIGOS
+  if (isWriting) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Desenhar o fluxo principal de telas e jornada do usuário',
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Estruturar o modelo de dados e componentes essenciais',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Desenvolver a funcionalidade principal ponta a ponta',
-        minutes: 45,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Testar usabilidade em dispositivo móvel e publicar preview',
-        minutes: 20,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: `Definir a ideia central e sumário de 3 pontos para “${cleanTitle}”`, minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Escrever o primeiro rascunho de 500 palavras sem se censurar', minutes: 30, done: false },
+      { id: crypto.randomUUID(), text: 'Lapidar o ritmo, clareza e eliminar trechos desnecessários', minutes: 20, done: false },
+      { id: crypto.randomUUID(), text: 'Compartilhar com 1 leitor de confiança ou publicar a primeira versão', minutes: 15, done: false },
     ];
   }
 
-  if (sectorId === 'business' || /venda|cliente|preço|loja|marketing|negócio|lançar/.test(lower)) {
+  // 5. SAÚDE, TREINO, EXERCÍCIOS
+  if (isFitness) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Definir o público ideal e a dor urgente que você resolve',
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Montar a proposta de valor e a precificação inicial',
-        minutes: 25,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Criar página ou mensagem de pré-lançamento para captação',
-        minutes: 35,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Abordar 5 clientes em potencial para feedback honesto',
-        minutes: 30,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: 'Separar roupas confortáveis, tênis e garrafa de água', minutes: 10, done: false },
+      { id: crypto.randomUUID(), text: 'Executar a primeira sessão em ritmo agradável e sustentável', minutes: 25, done: false },
+      { id: crypto.randomUUID(), text: 'Alongar levemente e registrar o nível de energia e bem-estar', minutes: 10, done: false },
+      { id: crypto.randomUUID(), text: 'Fixar no calendário os próximos dias da semana para manter o hábito', minutes: 10, done: false },
     ];
   }
 
-  if (sectorId === 'wood' || /marcenaria|madeira|móvel|físico|oficina|artesanato|projeto/.test(lower)) {
+  // 6. VIAGEM E PASSEIOS
+  if (isTravel) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Desenhar esboço com medidas finais e lista de cortes',
-        minutes: 25,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Verificar ferramentas, insumos e comprar o material bruto',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Executar cortes principais, usinagem e pré-montagem',
-        minutes: 60,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Lixamento progressivo, aplicação de acabamento e montagem',
-        minutes: 45,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: `Definir as datas estimadas e orçamento limite para “${cleanTitle}”`, minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Pesquisar 3 opções de transporte e hospedagem bem avaliadas', minutes: 30, done: false },
+      { id: crypto.randomUUID(), text: 'Montar roteiro dia a dia com paradas indispensáveis', minutes: 25, done: false },
+      { id: crypto.randomUUID(), text: 'Confirmar reservas e montar checklist de bagagem e documentos', minutes: 20, done: false },
     ];
   }
 
-  // Culinária, Confeitaria, Família
-  if (/bolo|receita|cenoura|cozinha|almoço|jantar|comida|avó|avô|visita|família|aniversário|sobremesa|pão/.test(lower)) {
+  // 7. FINANÇAS E ECONOMIA
+  if (isFinance) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Conferir os ingredientes na despensa e anotar o que falta comprar',
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Ir ao mercado e adquirir os itens frescos e a embalagem',
-        minutes: 25,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Executar o preparo e acompanhar o tempo de forno com atenção',
-        minutes: 45,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Finalizar a montagem/decoração e servir ou entregar com carinho',
-        minutes: 20,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: 'Abrir extrato dos últimos 30 dias e listar os custos fixos', minutes: 20, done: false },
+      { id: crypto.randomUUID(), text: 'Identificar 2 despesas supérfluas que podem ser canceladas', minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Definir valor mensal da meta a ser poupado logo no recebimento', minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Automatizar transferência para reserva de emergência', minutes: 10, done: false },
     ];
   }
 
-  // Livros, Leitura, Escrita
-  if (/livro|leitura|ler|escrever|capítulo|ebook|artigo|texto|redigir/.test(lower)) {
+  // 8. ESTUDOS E APRENDIZADO
+  if (isStudy) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: `Definir o tema central e sumário básico de “${title.slice(0, 35)}”`,
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Escrever o primeiro rascunho de 500 palavras sem se preocupar em editar',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Revisar a coerência, clareza e ritmo das ideias expressas',
-        minutes: 25,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Compartilhar o texto inicial com 1 leitor de confiança para feedback',
-        minutes: 15,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: `Mapear o conteúdo programático inicial para “${cleanTitle}”`, minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Reservar bloco protegido de 25 minutos para estudar o módulo 1', minutes: 25, done: false },
+      { id: crypto.randomUUID(), text: 'Fazer anotações manuscritas dos 3 conceitos mais relevantes', minutes: 20, done: false },
+      { id: crypto.randomUUID(), text: 'Resolver 2 exercícios práticos para fixar o aprendizado', minutes: 15, done: false },
     ];
   }
 
-  // Saúde, Exercício, Corrida, Hábitos
-  if (/correr|corrida|treino|academia|exercício|saúde|peso|dieta|hábito|meditar|alongar/.test(lower)) {
+  // 9. TECNOLOGIA, SOFTWARES E APPS
+  if (isTech) {
+    if (style === 'mvp') {
+      return [
+        { id: crypto.randomUUID(), text: `Definir a jornada única principal de “${cleanTitle}” em 1 fluxo`, minutes: 15, done: false },
+        { id: crypto.randomUUID(), text: 'Construir a versão mais simples funcional (mockup ou protótipo)', minutes: 35, done: false },
+        { id: crypto.randomUUID(), text: 'Testar com 1 pessoa real simulando o uso do começo ao fim', minutes: 20, done: false },
+        { id: crypto.randomUUID(), text: 'Anotar aprendizados prioritários para a próxima iteração', minutes: 15, done: false },
+      ];
+    }
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Separar tênis, roupas apropriadas e garrafa de água com antecedência',
-        minutes: 10,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Executar a primeira sessão no ritmo confortável (sem exageros)',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Fazer alongamento leve e registrar as sensações físicas e mentais',
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Agendar no calendário os próximos 3 dias fixos da semana para repetir',
-        minutes: 10,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: 'Desenhar o fluxo principal de telas e jornada do usuário', minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Estruturar o modelo de dados e componentes essenciais', minutes: 30, done: false },
+      { id: crypto.randomUUID(), text: 'Desenvolver a funcionalidade principal ponta a ponta', minutes: 45, done: false },
+      { id: crypto.randomUUID(), text: 'Testar usabilidade no celular e publicar preview online', minutes: 20, done: false },
     ];
   }
 
-  // Finanças, Economia, Investimentos
-  if (/dinheiro|finança|economizar|investir|gasto|orçamento|dívida|reserva/.test(lower)) {
+  // 10. NEGÓCIOS, VENDAS E MARKETING
+  if (isBusiness) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: 'Abrir o extrato bancário dos últimos 30 dias e listar os custos fixos',
-        minutes: 20,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Identificar 2 ou 3 despesas que podem ser canceladas ou renegociadas',
-        minutes: 20,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Definir o valor da meta mensal a ser poupado logo no dia do pagamento',
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Automatizar a transferência para a reserva de emergência',
-        minutes: 15,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: `Definir a dor urgente do cliente e a proposta de “${cleanTitle}”`, minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: 'Estruturar a oferta com precificação clara e garantia simples', minutes: 25, done: false },
+      { id: crypto.randomUUID(), text: 'Apresentar a proposta para 3 clientes potenciais diretamente', minutes: 35, done: false },
+      { id: crypto.randomUUID(), text: 'Registrar feedbacks de objeções e ajustar a mensagem de venda', minutes: 20, done: false },
     ];
   }
 
-  // Viagem, Passeio, Férias
-  if (/viagem|viajar|férias|passeio|hotel|passagem|roteiro|mala/.test(lower)) {
+  // 11. GERAL / PERSONALIZADO COM 5 PORQUÊS SE DISPONÍVEIS
+  if (validWhys.length >= 2) {
     return [
-      {
-        id: crypto.randomUUID(),
-        text: `Definir as datas ideais e o orçamento total estimado para ${title.slice(0, 30)}`,
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Pesquisar 3 opções de hospedagem bem avaliadas e transporte',
-        minutes: 30,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Montar a lista de atrações imperdíveis divididas por dia',
-        minutes: 25,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Confirmar as reservas principais e preparar o checklist de bagagem',
-        minutes: 20,
-        done: false,
-      },
-    ];
-  }
-
-  // Estudos, Cursos, Certificação
-  if (/estudar|curso|aprender|certificação|faculdade|idioma|inglês|prova/.test(lower)) {
-    return [
-      {
-        id: crypto.randomUUID(),
-        text: `Mapear o conteúdo programático e escolher o material didático guia`,
-        minutes: 15,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Criar um bloco protegido de 25 minutos no cronômetro para o módulo 1',
-        minutes: 25,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Fazer anotações manuscritas ou mapa mental dos pontos mais difíceis',
-        minutes: 20,
-        done: false,
-      },
-      {
-        id: crypto.randomUUID(),
-        text: 'Praticar com 3 exercícios reais para fixar o aprendizado na memória',
-        minutes: 20,
-        done: false,
-      },
+      { id: crypto.randomUUID(), text: `Destravar o primeiro passo concreto de “${cleanTitle}”: ${why1.slice(0, 55)}`, minutes: 15, done: false },
+      { id: crypto.randomUUID(), text: `Estruturar os materiais essenciais superando: “${why3.slice(0, 50)}”`, minutes: 25, done: false },
+      { id: crypto.randomUUID(), text: `Executar o núcleo prático da entrega sem desvios ou distrações`, minutes: 40, done: false },
+      { id: crypto.randomUUID(), text: `Concluir a primeira versão e validar o impacto: “${why5.slice(0, 60)}”`, minutes: 20, done: false },
     ];
   }
 
   return [
-    {
-      id: crypto.randomUUID(),
-      text: `Escrever a meta objetiva de “${title.slice(0, 40)}” e o resultado final esperado`,
-      minutes: 15,
-      done: false,
-    },
-    {
-      id: crypto.randomUUID(),
-      text: `Mapear os recursos, materiais e primeiros passos necessários para ${title.slice(0, 30)}`,
-      minutes: 20,
-      done: false,
-    },
-    {
-      id: crypto.randomUUID(),
-      text: `Construir a primeira versão funcional e colocar o plano em prática`,
-      minutes: 35,
-      done: false,
-    },
-    {
-      id: crypto.randomUUID(),
-      text: 'Revisar o que foi concluído e definir o próximo avanço no funil',
-      minutes: 15,
-      done: false,
-    },
+    { id: crypto.randomUUID(), text: `Escrever o resultado esperado de “${cleanTitle}” em 3 tópicos claros`, minutes: 15, done: false },
+    { id: crypto.randomUUID(), text: `Separar materiais e organizar o ambiente para o início imediato`, minutes: 20, done: false },
+    { id: crypto.randomUUID(), text: `Executar a primeira etapa prática com foco contínuo no cronômetro`, minutes: 35, done: false },
+    { id: crypto.randomUUID(), text: `Avaliar o progresso obtido e marcar o próximo passo no funil`, minutes: 15, done: false },
   ];
 }
 
-export function planIdea(text: string, sectors: Sector[]): Idea {
+export function planIdea(text: string, sectors: Sector[], fiveWhys?: string[]): Idea {
   const lower = text.toLocaleLowerCase('pt-BR');
   const rules: [RegExp, string][] = [
     [/app|site|software|código|tecnolog|digital|api|sistema/, 'tech'],
@@ -732,8 +838,14 @@ export function planIdea(text: string, sectors: Sector[]): Idea {
       ? 'Importante'
       : 'Normal';
 
-  const steps = generateAiSteps(title, text, sector?.id ?? 'personal', 'estruturado');
+  const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0);
+  const extraContext = validWhys && validWhys.length > 0 ? ` ${validWhys.join(' ')}` : '';
+  const steps = generateAiSteps(title, `${text}${extraContext}`, sector?.id ?? 'personal', 'estruturado', validWhys);
   const totalMinutes = steps.reduce((sum, s) => sum + s.minutes, 0);
+
+  const scopeNote = validWhys && validWhys[0]
+    ? `Entrega inicial da ideia "${title}". Propósito raiz: ${validWhys[0]}`
+    : `Entrega inicial da ideia "${title}". Foco no essencial para validar sem atrasos.`;
 
   return {
     id: crypto.randomUUID(),
@@ -745,15 +857,20 @@ export function planIdea(text: string, sectors: Sector[]): Idea {
     minutes: totalMinutes,
     dedicated: 0,
     steps,
-    scope: `Entrega inicial da ideia "${title}". Foco no essencial para validar sem atrasos.`,
+    scope: scopeNote,
     immediate: steps[0]?.text ?? 'Definir o primeiro resultado em uma frase.',
-    clarity: 'Reduza o escopo. Você só precisa avançar o primeiro passo, não resolver tudo agora.',
+    clarity: validWhys && validWhys[3]
+      ? `Foco no porquê: ${validWhys[3]}`
+      : 'Reduza o escopo. Você só precisa avançar o primeiro passo, não resolver tudo agora.',
     pivots: [],
+    fiveWhys: validWhys && validWhys.length > 0 ? validWhys : undefined,
     notes: [
       {
         id: crypto.randomUUID(),
         createdAt: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-        text: 'Ideia capturada. Pronta para lapidação e primeiro passo.',
+        text: validWhys && validWhys.length > 0
+          ? `Ideia estruturada com a metodologia dos 5 Porquês para máxima clareza de execução.`
+          : 'Ideia capturada. Pronta para lapidação e primeiro passo.',
       },
     ],
   };
@@ -1094,9 +1211,12 @@ export function detectSectorFromTitle(text: string, sectors: Sector[]): string {
 export function generateSubModulesAi(
   projectTitle: string,
   projectSummary: string,
-  sectorId: string
+  sectorId: string,
+  fiveWhys?: string[]
 ): { title: string; summary: string; minutes: number }[] {
-  const lower = `${projectTitle} ${projectSummary} ${sectorId}`.toLowerCase();
+  const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0) || [];
+  const whysContext = validWhys.join(' ');
+  const lower = `${projectTitle} ${projectSummary} ${sectorId} ${whysContext}`.toLowerCase();
 
   // 1. Reformas, Construção, Decoração e Casa (ex: Reformar minha cozinha)
   if (/reforma|cozinha|quarto|casa|apartamento|banheiro|obra|pintura|sala|parede|telhado|azulejo|piso|encanamento|elétrica/.test(lower)) {

@@ -9,6 +9,13 @@ import {
   getParentIdea,
   getProjectStats,
   generateSubModulesAi,
+  FIVE_WHYS_QUESTIONS,
+  suggestFiveWhysOffline,
+  defaultCompanyWorkspace,
+  defaultCompanySectors,
+  defaultTeamMembers,
+  createStarterBusinessIdeas,
+  generateAiSteps,
 } from '@/lib/ideaflow';
 
 describe('Ideaflow offline engine', () => {
@@ -173,5 +180,61 @@ describe('Ideaflow offline engine', () => {
     // Testa agradecimento
     const gratitude = await askMentorAi({ message: 'muito obrigado!' });
     expect(gratitude.reply).toContain('Por nada');
+  });
+
+  it('supports the 5 Whys methodology for deep idea context and planning', () => {
+    expect(FIVE_WHYS_QUESTIONS).toHaveLength(5);
+    expect(FIVE_WHYS_QUESTIONS[0].step).toBe(1);
+
+    const offlineWhys = suggestFiveWhysOffline('Fazer um bolo de cenoura artesanal para vender');
+    expect(offlineWhys).toHaveLength(5);
+    expect(offlineWhys[0]).toContain('sabor');
+
+    const sampleWhys = [
+      'Criar uma confeitaria caseira sem conservantes',
+      'Pessoas no bairro procuram doces artesanais',
+      'Faltava testar a receita em tamanho família',
+      'Independência financeira e realização',
+      'Vender sob encomenda no fim de semana',
+    ];
+
+    const planned = planIdea('Fazer bolo de cenoura', initialSectors, sampleWhys);
+    expect(planned.fiveWhys).toEqual(sampleWhys);
+    expect(planned.scope).toContain('Criar uma confeitaria caseira sem conservantes');
+    expect(planned.steps.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('supports Enterprise Workspace with company sectors, team members and business ideas', () => {
+    expect(defaultCompanySectors.length).toBeGreaterThanOrEqual(4);
+    expect(defaultCompanySectors.some((s: any) => s.id === 'qa')).toBe(true);
+    expect(defaultCompanySectors.some((s: any) => s.id === 'quality')).toBe(true);
+    expect(defaultCompanySectors.some((s: any) => s.id === 'marketing')).toBe(true);
+
+    expect(defaultTeamMembers.length).toBeGreaterThanOrEqual(3);
+    expect(defaultCompanyWorkspace.name).toBeDefined();
+
+    const bizIdeas = createStarterBusinessIdeas();
+    expect(bizIdeas.length).toBeGreaterThan(0);
+    expect(bizIdeas.every((i: any) => i.workspace === 'business')).toBe(true);
+    expect(bizIdeas.some((i: any) => i.assignedTo)).toBe(true);
+
+    const initial = seedData();
+    initial.workspaceMode = 'business';
+    initial.companyWorkspace = defaultCompanyWorkspace;
+    initial.ideas = bizIdeas;
+    expect(isFlowData(initial)).toBe(true);
+  });
+
+  it('generates context-accurate steps for vlog and creative projects without generic startup templates', () => {
+    const title = 'Vlog show do bts';
+    const summary = 'vou no show do bts e queria fazer um vlog completo a partir da viagem do aeroporto ate o final';
+    const stepsMvp = generateAiSteps(title, summary, 'personal', 'mvp');
+    expect(stepsMvp.length).toBeGreaterThanOrEqual(3);
+    const combinedText = stepsMvp.map(s => s.text.toLowerCase()).join(' ');
+    // Does NOT contain generic software startup keywords
+    expect(combinedText).not.toContain('mockup');
+    expect(combinedText).not.toContain('público-alvo');
+    // DOES contain media/vlog related keywords
+    expect(combinedText).toMatch(/vlog|grava|show|aeroporto|clipe|bateria/);
   });
 });
