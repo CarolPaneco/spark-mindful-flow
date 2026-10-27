@@ -1,5 +1,24 @@
 import "./lib/error-capture";
 
+// Polyfill seguro de WebSocket para SSR em ambientes Node sem WebSocket nativo
+if (typeof globalThis.WebSocket === 'undefined') {
+  (globalThis as any).WebSocket = class SSRWebSocket {
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+    static readonly CLOSING = 2;
+    static readonly CLOSED = 3;
+    readonly readyState = 3;
+    onopen: any = null;
+    onclose: any = null;
+    onerror: any = null;
+    onmessage: any = null;
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() {}
+  };
+}
+
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleGeminiBackend } from "./lib/gemini-server";

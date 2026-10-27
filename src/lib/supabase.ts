@@ -1,6 +1,25 @@
 import { createClient, type User, type Session } from '@supabase/supabase-js';
 import type { Idea, FlowData, CompanyWorkspace, CompanyJoinRequest, TeamMember } from './ideaflow';
 
+// Polyfill seguro de WebSocket para SSR em Node < 22 (Netlify Serverless)
+if (typeof window === 'undefined' && typeof globalThis.WebSocket === 'undefined') {
+  (globalThis as any).WebSocket = class SSRWebSocket {
+    static readonly CONNECTING = 0;
+    static readonly OPEN = 1;
+    static readonly CLOSING = 2;
+    static readonly CLOSED = 3;
+    readonly readyState = 3;
+    onopen: any = null;
+    onclose: any = null;
+    onerror: any = null;
+    onmessage: any = null;
+    addEventListener() {}
+    removeEventListener() {}
+    send() {}
+    close() {}
+  };
+}
+
 const supabaseUrl =
   (import.meta as any).env?.VITE_SUPABASE_URL || 'https://vhljktzcvqzwssmvbznx.supabase.co';
 const supabaseAnonKey =
@@ -9,9 +28,9 @@ const supabaseAnonKey =
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
+    persistSession: typeof window !== 'undefined',
+    autoRefreshToken: typeof window !== 'undefined',
+    detectSessionInUrl: typeof window !== 'undefined',
   },
 });
 
