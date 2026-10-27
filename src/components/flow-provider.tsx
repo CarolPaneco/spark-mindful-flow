@@ -444,11 +444,16 @@ export function FlowProvider({ children }: { children: ReactNode }) {
 
   const updateIdea = (id: string, patch: Partial<Idea>) => {
     setData(prev => {
-      const updatedIdeas = prev.ideas.map(i => (i.id === id ? { ...i, ...patch } : i));
+      // Garante imutabilidade estrita do workspace da ideia (pessoal é pessoal, empresa é empresa)
+      const existing = prev.ideas.find(i => i.id === id);
+      const safeWorkspace = existing?.workspace || 'personal';
+      const safePatch = { ...patch, workspace: safeWorkspace };
+
+      const updatedIdeas = prev.ideas.map(i => (i.id === id ? { ...i, ...safePatch } : i));
       if (user) {
         const target = updatedIdeas.find(i => i.id === id);
         if (target) {
-          const companyId = prev.companyWorkspace?.id;
+          const companyId = target.workspace === 'business' ? (target.companyId || prev.companyWorkspace?.id) : undefined;
           void syncIdeasToSupabase([target], user.id, companyId);
         }
       }

@@ -100,11 +100,15 @@ export function rowToIdea(row: any): Idea {
  * Converte ideia do Ideaflow para linha do Supabase
  */
 export function ideaToRow(idea: Idea, userId: string, companyId?: string) {
+  const isPersonal = idea.workspace === 'personal' || (!idea.workspace && !idea.companyId);
+  const resolvedWorkspace = isPersonal ? 'personal' : 'business';
+  const resolvedCompanyId = isPersonal ? undefined : (idea.companyId || companyId || undefined);
+
   const meta = {
-    workspace: idea.workspace || 'personal',
-    companyId: idea.companyId || companyId || undefined,
-    assignedTo: idea.assignedTo || undefined,
-    department: idea.department || undefined,
+    workspace: resolvedWorkspace,
+    companyId: resolvedCompanyId,
+    assignedTo: isPersonal ? undefined : (idea.assignedTo || undefined),
+    department: isPersonal ? undefined : (idea.department || undefined),
     fiveWhys: idea.fiveWhys || undefined,
   };
   const metaComment = `\n<!--ideaflow-meta:${encodeURIComponent(JSON.stringify(meta))}-->`;
@@ -130,11 +134,11 @@ export function ideaToRow(idea: Idea, userId: string, companyId?: string) {
     is_project: Boolean(idea.isProject),
     archived: Boolean(idea.archived),
     archived_at: idea.archivedAt || null,
-    // Campos estendidos para workspaces e empresas compartilhadas
-    workspace: idea.workspace || 'personal',
-    company_id: idea.companyId || companyId || null,
-    assigned_to: idea.assignedTo || null,
-    department: idea.department || null,
+    // Campos estendidos para workspaces e empresas compartilhadas com isolamento estrito
+    workspace: resolvedWorkspace,
+    company_id: resolvedCompanyId || null,
+    assigned_to: isPersonal ? null : (idea.assignedTo || null),
+    department: isPersonal ? null : (idea.department || null),
     five_whys: idea.fiveWhys || [],
     updated_at: new Date().toISOString(),
   };

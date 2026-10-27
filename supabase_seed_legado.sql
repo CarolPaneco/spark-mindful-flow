@@ -1048,10 +1048,75 @@ INSERT INTO public.ideas (
 );
 
 -- ==============================================================================
--- 9. FINALIZAÇÃO E RELATÓRIO DO SCRIPT
+-- 9. ATUALIZAÇÃO CORRETIVA E BLINDAGEM DE SETORES E WORKSPACES
+-- ==============================================================================
+
+-- 1. Garante os setores no perfil
+UPDATE public.profiles
+SET sectors = '[
+  {"id": "tech", "name": "Desenvolvimento & Sites", "tone": "cyan"},
+  {"id": "insta", "name": "Conteúdo & Instagram", "tone": "pink"},
+  {"id": "fitness", "name": "Academia & Dieta", "tone": "amber"},
+  {"id": "family", "name": "Família & Vida Pessoal", "tone": "green"},
+  {"id": "business", "name": "Projetos & Clientes", "tone": "violet"}
+]'::jsonb
+WHERE id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4';
+
+-- 2. Atualiza e blinda todas as ideias pessoais (workspace = 'personal', company_id = NULL)
+UPDATE public.ideas
+SET sector = 'insta', workspace = 'personal', company_id = NULL, department = NULL, assigned_to = NULL
+WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4' AND id IN ('idea-p-01', 'idea-p-02', 'idea-p-03', 'idea-p-04');
+
+UPDATE public.ideas
+SET sector = 'business', workspace = 'personal', company_id = NULL, department = NULL, assigned_to = NULL
+WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4' AND id IN ('idea-p-05', 'idea-p-06-macro', 'idea-p-06-sub1', 'idea-p-06-sub2');
+
+UPDATE public.ideas
+SET sector = 'tech', workspace = 'personal', company_id = NULL, department = NULL, assigned_to = NULL
+WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4' AND id IN ('idea-p-07', 'idea-p-13-archived');
+
+UPDATE public.ideas
+SET sector = 'fitness', workspace = 'personal', company_id = NULL, department = NULL, assigned_to = NULL
+WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4' AND id IN ('idea-p-08', 'idea-p-09');
+
+UPDATE public.ideas
+SET sector = 'family', workspace = 'personal', company_id = NULL, department = NULL, assigned_to = NULL
+WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4' AND id IN ('idea-p-10', 'idea-p-11', 'idea-p-12');
+
+-- 3. Atualiza e blinda todas as ideias corporativas
+UPDATE public.ideas
+SET sector = 'tech', workspace = 'business', company_id = 'comp-supe_585', department = 'Tecnologia & Dev'
+WHERE id IN ('idea-e-01', 'idea-e-05');
+
+UPDATE public.ideas
+SET sector = 'quality', workspace = 'business', company_id = 'comp-supe_585', department = 'Qualidade & Produto'
+WHERE id = 'idea-e-02';
+
+UPDATE public.ideas
+SET sector = 'ops', workspace = 'business', company_id = 'comp-supe_585', department = 'Operações & RH'
+WHERE id = 'idea-e-03';
+
+UPDATE public.ideas
+SET sector = 'marketing', workspace = 'business', company_id = 'comp-supe_585', department = 'Marketing & Growth'
+WHERE id = 'idea-e-04';
+
+UPDATE public.ideas
+SET sector = 'marketing', workspace = 'business', company_id = 'comp-spark_920', department = 'Marketing & Growth'
+WHERE id = 'idea-spark-01';
+
+UPDATE public.ideas
+SET sector = 'quality', workspace = 'business', company_id = 'comp-spark_920', department = 'Qualidade & Produto'
+WHERE id = 'idea-spark-02';
+
+-- 4. Blinda no banco para que NENHUMA ideia pessoal tenha company_id e vice-versa
+UPDATE public.ideas SET company_id = NULL WHERE workspace = 'personal';
+UPDATE public.ideas SET workspace = 'business' WHERE company_id IS NOT NULL;
+
+-- ==============================================================================
+-- 10. FINALIZAÇÃO E RELATÓRIO DO SCRIPT
 -- ==============================================================================
 SELECT
-  'DADOS CARREGADOS COM SUCESSO! 🚀' as status,
+  'DADOS CARREGADOS E SETORES BLINDADOS COM SUCESSO! 🚀' as status,
   (SELECT count(*) FROM public.ideas WHERE workspace = 'personal') as ideias_pessoais,
   (SELECT count(*) FROM public.ideas WHERE workspace = 'business') as ideias_empresariais,
   (SELECT count(*) FROM public.companies) as empresas_cadastradas,
