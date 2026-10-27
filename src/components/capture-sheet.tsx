@@ -34,6 +34,7 @@ import {
   suggestFiveWhysOffline,
   defaultCompanySectors,
   defaultTeamMembers,
+  initialSectors,
   type Idea,
   type Step,
 } from '@/lib/ideaflow';
@@ -283,8 +284,8 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
 
   const isBusiness = data.workspaceMode === 'business';
   const activeSectors = isBusiness
-    ? (data.companyWorkspace?.sectors ?? defaultCompanySectors)
-    : data.sectors;
+    ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
+    : (data.sectors?.length ? data.sectors : initialSectors);
   const companyMembers = data.companyWorkspace?.members ?? [];
 
   const handleGenerateDraft = async () => {

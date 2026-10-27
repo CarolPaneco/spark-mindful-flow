@@ -36,6 +36,7 @@ import {
   suggestFiveWhysOffline,
   defaultCompanySectors,
   defaultTeamMembers,
+  initialSectors,
   type Idea,
 } from '@/lib/ideaflow';
 import { generateProjectModulesWithAi, getActiveGeminiKey } from '@/lib/ai-assistant';
@@ -62,8 +63,8 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
   const isBusiness = data.workspaceMode === 'business';
   const currentWhysQuestions = getFiveWhysQuestions(isBusiness);
   const activeSectors = isBusiness
-    ? (data.companyWorkspace?.sectors ?? defaultCompanySectors)
-    : data.sectors;
+    ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
+    : (data.sectors?.length ? data.sectors : initialSectors);
   const companyMembers = data.companyWorkspace?.members ?? [];
 
   const [title, setTitle] = useState('');

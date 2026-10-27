@@ -46,6 +46,8 @@ import {
   calculateGlobalSectorComparison,
   calculateSectorAnalytics,
   resolveSector,
+  initialSectors,
+  defaultCompanySectors,
   formatMinutes,
   stageNames,
   type Tone,
@@ -135,7 +137,18 @@ function Sectors() {
   const isBusiness = data.workspaceMode === 'business';
   const company = data.companyWorkspace;
   const readyTemplates = getReadySectorTemplates(isBusiness);
-  const currentSectors = isBusiness && company ? company.sectors : data.sectors;
+  const companySectors = (company?.sectors && company.sectors.length > 0) ? company.sectors : defaultCompanySectors;
+  const userSectors = (data.sectors && data.sectors.length > 0) ? data.sectors : initialSectors;
+  const currentSectors = isBusiness && company ? companySectors : userSectors;
+
+  useEffect(() => {
+    if (!isBusiness && (!data.sectors || data.sectors.length === 0)) {
+      setData(prev => ({
+        ...prev,
+        sectors: initialSectors.map(s => ({ ...s })),
+      }));
+    }
+  }, [isBusiness, data.sectors, setData]);
   const workspaceIdeas = data.ideas.filter(i => isBusiness ? i.workspace === 'business' : i.workspace !== 'business');
 
   const activeIdeas = workspaceIdeas.filter(i => !i.archived);

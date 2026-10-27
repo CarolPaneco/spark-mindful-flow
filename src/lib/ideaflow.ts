@@ -776,7 +776,7 @@ export const seedData = (withDemos = false): FlowData => {
     },
     workspaceMode: 'personal',
     companyWorkspace: undefined,
-    sectors: withDemos ? initialSectors.map(s => ({ ...s })) : [],
+    sectors: initialSectors.map(s => ({ ...s })),
     ideas: withDemos ? demoIdeas : [],
   };
 };

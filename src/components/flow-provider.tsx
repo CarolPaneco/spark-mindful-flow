@@ -62,7 +62,13 @@ interface FlowStore {
 const FlowContext = createContext<FlowStore | null>(null);
 
 export function FlowProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<FlowData>(seedData);
+  const [data, setData] = useState<FlowData>(() => {
+    const base = seedData();
+    return {
+      ...base,
+      sectors: initialSectors.map(s => ({ ...s })),
+    };
+  });
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
@@ -317,7 +323,14 @@ export function FlowProvider({ children }: { children: ReactNode }) {
 
       const resolvedSectors = (userProfile?.sectors && Array.isArray(userProfile.sectors) && userProfile.sectors.length > 0)
         ? userProfile.sectors
-        : initialSectors;
+        : initialSectors.map(s => ({ ...s }));
+
+      // Se o perfil remoto não tinha setores gravados, persiste imediatamente no Supabase
+      if (!userProfile?.sectors || !Array.isArray(userProfile.sectors) || userProfile.sectors.length === 0) {
+        void upsertUserProfile(currentUser.id, {
+          sectors: resolvedSectors,
+        });
+      }
 
       if (userProfile) {
         setProfile(userProfile);
@@ -633,7 +646,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     setData(prev => ({
       ...prev,
       ideas: [],
-      sectors: [],
+      sectors: initialSectors.map(s => ({ ...s })),
       profile: {
         name: 'Criador(a)',
         role: 'Criador(a)',

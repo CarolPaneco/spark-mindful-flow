@@ -1,7 +1,7 @@
 import { ArrowUpRight, Check, Clock3, Play, MoreHorizontal, Zap, Circle, FolderTree, CornerDownRight, Archive, User, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
-import { formatMinutes, getSubIdeas, getParentIdea, resolveSector, defaultCompanySectors, type Idea } from '@/lib/ideaflow';
+import { formatMinutes, getSubIdeas, getParentIdea, resolveSector, defaultCompanySectors, initialSectors, type Idea } from '@/lib/ideaflow';
 
 interface Props {
   idea: Idea;
@@ -12,8 +12,8 @@ interface Props {
 export function IdeaCard({ idea, onOpen, onFocus }: Props) {
   const { data } = useFlow();
   const availableSectors = (data.workspaceMode === 'business' && data.companyWorkspace)
-    ? (data.companyWorkspace.sectors || defaultCompanySectors)
-    : data.sectors;
+    ? (data.companyWorkspace.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
+    : (data.sectors?.length ? data.sectors : initialSectors);
   const sector = resolveSector(idea.sector, availableSectors, idea.title, idea.summary);
   const completed = idea.steps.filter(s => s.done).length;
   const percent = idea.steps.length ? Math.round((completed / idea.steps.length) * 100) : 0;

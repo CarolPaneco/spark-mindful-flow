@@ -57,6 +57,8 @@ import {
   suggestFiveWhysOffline,
   defaultCompanySectors,
   defaultTeamMembers,
+  initialSectors,
+  resolveSector,
   type Idea,
   type Stage,
   type Step,
@@ -581,12 +583,17 @@ export function IdeaDetail({
               </span>
             )}
 
-            {idea.department && (
-              <span className="text-[11px] bg-cyan/15 text-cyan border border-cyan/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-medium">
-                <Tag size={11} />
-                {idea.department}
-              </span>
-            )}
+            <span className="text-[11px] bg-cyan/15 text-cyan border border-cyan/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-medium">
+              <Tag size={11} />
+              {resolveSector(
+                idea.sector,
+                idea.workspace === 'business'
+                  ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
+                  : (data.sectors?.length ? data.sectors : initialSectors),
+                idea.title,
+                idea.summary
+              ).name}
+            </span>
 
             {idea.assignedTo && (
               <span className="text-[11px] bg-primary/15 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-medium">
@@ -801,8 +808,8 @@ export function IdeaDetail({
                       onChange={e => {
                         const newSecId = e.target.value;
                         const applicableSectors = idea.workspace === 'business'
-                          ? (data.companyWorkspace?.sectors ?? defaultCompanySectors)
-                          : data.sectors;
+                          ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
+                          : (data.sectors?.length ? data.sectors : initialSectors);
                         const secObj = applicableSectors.find(s => s.id === newSecId);
                         updateIdea(idea.id, {
                           sector: newSecId,
@@ -812,11 +819,11 @@ export function IdeaDetail({
                       }}
                     >
                       {idea.workspace === 'business' ? (
-                        (data.companyWorkspace?.sectors ?? defaultCompanySectors).map(s => (
+                        (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors).map(s => (
                           <option key={`biz-${s.id}`} value={s.id}>{s.name}</option>
                         ))
                       ) : (
-                        data.sectors.map(s => (
+                        (data.sectors?.length ? data.sectors : initialSectors).map(s => (
                           <option key={`per-${s.id}`} value={s.id}>{s.name}</option>
                         ))
                       )}
@@ -1014,7 +1021,7 @@ export function IdeaDetail({
                 <label>
                   Setor
                   <select value={idea.sector} onChange={e => updateIdea(idea.id, { sector: e.target.value })}>
-                    {data.sectors.map(s => (
+                    {(data.sectors?.length ? data.sectors : initialSectors).map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>
