@@ -45,6 +45,7 @@ import {
 import {
   calculateGlobalSectorComparison,
   calculateSectorAnalytics,
+  resolveSector,
   formatMinutes,
   stageNames,
   type Tone,
@@ -530,7 +531,7 @@ function Sectors() {
             <div className="sectors-grid">
               {currentSectors.map(s => {
                 const Icon = getSectorIcon(s.id, s.name);
-                const ideas = workspaceIdeas.filter(i => i.sector === s.id);
+                const ideas = workspaceIdeas.filter(i => resolveSector(i.sector, currentSectors, i.title, i.summary).id === s.id);
                 const done = ideas.filter(i => i.stage === 4).length;
                 const minutes = ideas.reduce((sum, i) => sum + i.dedicated, 0);
 
@@ -1088,7 +1089,7 @@ function Sectors() {
 
                   <div className="stage-cards">
                     {activeIdeas
-                      .filter(i => i.sector === selected)
+                      .filter(i => resolveSector(i.sector, currentSectors, i.title, i.summary).id === selected)
                       .map(i => (
                         <IdeaCard
                           key={i.id}
@@ -1103,7 +1104,7 @@ function Sectors() {
                           }}
                         />
                       ))}
-                    {!data.ideas.some(i => i.sector === selected) && (
+                    {!activeIdeas.some(i => resolveSector(i.sector, currentSectors, i.title, i.summary).id === selected) && (
                       <p className="day-empty text-center py-8">
                         Nenhuma ideia neste setor ainda. Capture a primeira faísca!
                       </p>

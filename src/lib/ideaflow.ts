@@ -134,6 +134,82 @@ export const initialSectors: Sector[] = [
   { id: 'personal', name: 'Vida Pessoal & Rotina', tone: 'pink' },
 ];
 
+/**
+ * Dedução automática e inteligente de setor a partir de palavras-chave no conteúdo
+ */
+export function inferSectorFromContent(title?: string, summary?: string): string {
+  const text = `${title || ''} ${summary || ''}`.toLowerCase();
+  
+  if (/reels|instagram|insta|post|carrossel|manychat|dm|tiktok|youtube|grav|conte[uú]do|audi[eê]ncia/i.test(text)) {
+    return 'insta';
+  }
+  if (/react|api|serverless|code|dev|site|html|css|tailwind|javascript|typescript|front|back|bug|deploy|github|pipeline|sistema/i.test(text)) {
+    return 'tech';
+  }
+  if (/trein|muscula|academia|dieta|marmit|refei|protein|hipertrofia|sa[uú]de|corrid|exerc[ií]cio|água|smartfit/i.test(text)) {
+    return 'fitness';
+  }
+  if (/fam[ií]lia|m[aã]e|pai|irm[aã]|almo[cç]o|viagem|ubatuba|casa|domingo|filh|namor/i.test(text)) {
+    return 'family';
+  }
+  if (/client|contrat|loja|venda|e-commerce|aura|cl[ií]nica|odontolog|projeto|pagamento|checkout|pre[cç]o|neg[oó]cio/i.test(text)) {
+    return 'business';
+  }
+
+  return 'tech';
+}
+
+/**
+ * Resolve o setor de forma resiliente para nunca deixar uma ideia 'Sem setor'
+ */
+export function resolveSector(
+  sectorId: string | undefined,
+  availableSectors: Sector[],
+  title?: string,
+  summary?: string
+): Sector {
+  const fallbackList = availableSectors && availableSectors.length > 0 ? availableSectors : initialSectors;
+
+  // 1. Tenta correspondência exata por ID
+  if (sectorId) {
+    const directMatch = fallbackList.find(s => s.id === sectorId);
+    if (directMatch) return directMatch;
+  }
+
+  // 2. Mapeamento de equivalências e sinônimos conhecidos
+  const lowerSec = (sectorId || '').toLowerCase().trim();
+  if (lowerSec === 'dev' || lowerSec === 'code' || lowerSec === 'tecnologia') {
+    const match = fallbackList.find(s => s.id === 'tech');
+    if (match) return match;
+  }
+  if (lowerSec === 'instagram' || lowerSec === 'social' || lowerSec === 'conteudo') {
+    const match = fallbackList.find(s => s.id === 'insta');
+    if (match) return match;
+  }
+  if (lowerSec === 'dieta' || lowerSec === 'academia' || lowerSec === 'saude') {
+    const match = fallbackList.find(s => s.id === 'fitness');
+    if (match) return match;
+  }
+  if (lowerSec === 'familia' || lowerSec === 'pessoal' || lowerSec === 'personal' || lowerSec === 'vida pessoal') {
+    const match = fallbackList.find(s => s.id === 'family' || s.id === 'personal');
+    if (match) return match;
+  }
+  if (lowerSec === 'negocios' || lowerSec === 'clientes' || lowerSec === 'projetos') {
+    const match = fallbackList.find(s => s.id === 'business');
+    if (match) return match;
+  }
+
+  // 3. Se ainda não achou, infere pelo título e resumo
+  if (title || summary) {
+    const inferredId = inferSectorFromContent(title, summary);
+    const inferredMatch = fallbackList.find(s => s.id === inferredId);
+    if (inferredMatch) return inferredMatch;
+  }
+
+  // 4. Fallback seguro: retorna o primeiro setor da lista disponível
+  return fallbackList[0];
+}
+
 export const defaultCompanySectors: Sector[] = [
   { id: 'tech', name: 'Tecnologia & Dev', tone: 'cyan' },
   { id: 'marketing', name: 'Marketing & Growth', tone: 'pink' },
@@ -1068,8 +1144,9 @@ export interface SectorAnalytics {
   healthMessage: string;
 }
 
-export function calculateSectorAnalytics(sector: Sector, ideas: Idea[]): SectorAnalytics {
-  const sectorIdeas = ideas.filter(i => i.sector === sector.id);
+export function calculateSectorAnalytics(sector: Sector, ideas: Idea[], allSectors?: Sector[]): SectorAnalytics {
+  const sectorsList = allSectors && allSectors.length > 0 ? allSectors : [sector];
+  const sectorIdeas = ideas.filter(i => resolveSector(i.sector, sectorsList, i.title, i.summary).id === sector.id);
   const totalIdeas = sectorIdeas.length;
   const completedIdeas = sectorIdeas.filter(i => i.stage === 4).length;
   const completionRate = totalIdeas > 0 ? Math.round((completedIdeas / totalIdeas) * 100) : 0;
@@ -1128,7 +1205,7 @@ export interface GlobalSectorsAnalysis {
 }
 
 export function calculateGlobalSectorComparison(sectors: Sector[], ideas: Idea[]): GlobalSectorsAnalysis {
-  const sectorMetrics = sectors.map(s => calculateSectorAnalytics(s, ideas));
+  const sectorMetrics = sectors.map(s => calculateSectorAnalytics(s, ideas, sectors));
 
   // Ordena por taxa de entrega e tempo dedicado para o mais desenvolvido
   const activeMetrics = sectorMetrics.filter(m => m.totalIdeas > 0);

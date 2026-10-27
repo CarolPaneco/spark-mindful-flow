@@ -1,7 +1,7 @@
 import { ArrowUpRight, Check, Clock3, Play, MoreHorizontal, Zap, Circle, FolderTree, CornerDownRight, Archive, User, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlow } from '@/components/flow-provider';
-import { formatMinutes, getSubIdeas, getParentIdea, type Idea } from '@/lib/ideaflow';
+import { formatMinutes, getSubIdeas, getParentIdea, resolveSector, defaultCompanySectors, type Idea } from '@/lib/ideaflow';
 
 interface Props {
   idea: Idea;
@@ -11,10 +11,10 @@ interface Props {
 
 export function IdeaCard({ idea, onOpen, onFocus }: Props) {
   const { data } = useFlow();
-  const sector =
-    (data.workspaceMode === 'business'
-      ? data.companyWorkspace?.sectors.find(s => s.id === idea.sector) ?? data.sectors.find(s => s.id === idea.sector)
-      : data.sectors.find(s => s.id === idea.sector) ?? data.companyWorkspace?.sectors.find(s => s.id === idea.sector));
+  const availableSectors = (data.workspaceMode === 'business' && data.companyWorkspace)
+    ? (data.companyWorkspace.sectors || defaultCompanySectors)
+    : data.sectors;
+  const sector = resolveSector(idea.sector, availableSectors, idea.title, idea.summary);
   const completed = idea.steps.filter(s => s.done).length;
   const percent = idea.steps.length ? Math.round((completed / idea.steps.length) * 100) : 0;
 
@@ -22,12 +22,12 @@ export function IdeaCard({ idea, onOpen, onFocus }: Props) {
   const parent = getParentIdea(data.ideas, idea);
 
   return (
-    <article className={`idea-card tone-${sector?.tone ?? 'cyan'} ${idea.stage === 4 ? 'realized' : ''} animate-in fade-in-50 duration-300 slide-in-from-bottom-1`}>
+    <article className={`idea-card tone-${sector.tone} ${idea.stage === 4 ? 'realized' : ''} animate-in fade-in-50 duration-300 slide-in-from-bottom-1`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="sector-tag transition-all duration-200">
             <Circle size={7} fill="currentColor" />
-            {sector?.name ?? idea.department ?? 'Sem setor'}
+            {sector.name}
           </span>
           {idea.assignedTo && (
             <span

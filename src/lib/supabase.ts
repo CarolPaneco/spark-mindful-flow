@@ -1,5 +1,5 @@
 import { createClient, type User, type Session } from '@supabase/supabase-js';
-import type { Idea, FlowData, CompanyWorkspace, CompanyJoinRequest, TeamMember } from './ideaflow';
+import { inferSectorFromContent, type Idea, type FlowData, type CompanyWorkspace, type CompanyJoinRequest, type TeamMember } from './ideaflow';
 
 // Polyfill seguro de WebSocket para SSR em Node < 22 (Netlify Serverless)
 if (typeof window === 'undefined' && typeof globalThis.WebSocket === 'undefined') {
@@ -65,11 +65,16 @@ export function rowToIdea(row: any): Idea {
     ? row.summary.replace(/<!--ideaflow-meta:.*?-->/, '').trim()
     : '';
 
+  const rawSector = row.sector || extraMeta.sector;
+  const resolvedSector = (rawSector && rawSector !== 'personal' && rawSector !== 'geral')
+    ? rawSector
+    : inferSectorFromContent(row.title, cleanSummary);
+
   return {
     id: row.id,
     title: row.title,
     summary: cleanSummary,
-    sector: row.sector || extraMeta.sector || 'personal',
+    sector: resolvedSector,
     priority: row.priority || extraMeta.priority || 'Normal',
     stage: row.stage ?? 0,
     minutes: row.minutes ?? 60,
