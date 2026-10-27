@@ -5,7 +5,10 @@ export function cleanApiKey(key: string): string {
   return key.trim().replace(/^Bearer\s+/i, '').replace(/^["']|["']$/g, '');
 }
 
-export const DEFAULT_GROQ_KEY = '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';
+export const DEFAULT_GROQ_KEY =
+  (typeof process !== 'undefined' ? process.env?.['VITE_GROQ_API_KEY'] || process.env?.['GROQ_API_KEY'] : '') ||
+  (import.meta as any).env?.VITE_GROQ_API_KEY ||
+  '';
 
 export const GEMINI_MODELS = [
   'gemini-2.5-flash',
