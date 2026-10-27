@@ -212,10 +212,11 @@ export function FlowProvider({ children }: { children: ReactNode }) {
             i => !i.id.startsWith('demo-') && !i.id.startsWith('biz-') && i.companyId !== 'company-acme-corp'
           );
           const cleanSectors = (parsed.sectors || []).filter(s => s.id !== 'wood');
+          const finalSectors = cleanSectors.length > 0 ? cleanSectors : initialSectors;
           setData({
             ...parsed,
             ideas: cleanIdeas,
-            sectors: cleanSectors,
+            sectors: finalSectors,
             companies: validCompanies,
             companyWorkspace: activeCompany,
             activeCompanyId: activeCompany?.id,
@@ -314,6 +315,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const resolvedSectors = (userProfile?.sectors && Array.isArray(userProfile.sectors) && userProfile.sectors.length > 0)
+        ? userProfile.sectors
+        : initialSectors;
+
       if (userProfile) {
         setProfile(userProfile);
         setData(prev => ({
@@ -325,6 +330,12 @@ export function FlowProvider({ children }: { children: ReactNode }) {
             streak: prev.profile?.streak ?? 1,
             personalPin: remotePin || prev.profile?.personalPin,
           },
+          sectors: resolvedSectors,
+        }));
+      } else {
+        setData(prev => ({
+          ...prev,
+          sectors: resolvedSectors,
         }));
       }
 

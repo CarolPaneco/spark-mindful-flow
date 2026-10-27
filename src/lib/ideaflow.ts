@@ -126,9 +126,12 @@ export const stageTones: Tone[] = ['cyan', 'violet', 'pink', 'amber', 'green'];
 export const palettes = ['Aurora', 'Oceano', 'Solar', 'Flora', 'Prisma', 'Pulse'];
 
 export const initialSectors: Sector[] = [
-  { id: 'tech', name: 'Tecnologia', tone: 'cyan' },
-  { id: 'business', name: 'Negócios', tone: 'violet' },
-  { id: 'personal', name: 'Vida pessoal', tone: 'pink' },
+  { id: 'tech', name: 'Desenvolvimento & Sites', tone: 'cyan' },
+  { id: 'insta', name: 'Conteúdo & Instagram', tone: 'pink' },
+  { id: 'fitness', name: 'Academia & Dieta', tone: 'amber' },
+  { id: 'family', name: 'Família & Vida Pessoal', tone: 'green' },
+  { id: 'business', name: 'Projetos & Clientes', tone: 'violet' },
+  { id: 'personal', name: 'Vida Pessoal & Rotina', tone: 'pink' },
 ];
 
 export const defaultCompanySectors: Sector[] = [

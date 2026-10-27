@@ -770,77 +770,87 @@ export function IdeaDetail({
               <div className="p-4 rounded-xl border border-border/70 bg-card/70 space-y-3">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Building2 size={14} className="text-violet" />
-                  Contexto de Workspace & Atribuição
+                  Contexto de Workspace & Classificação
                 </span>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Espaço / Workspace</label>
-                    <select
-                      className="text-field text-xs py-1.5 w-full"
-                      value={idea.workspace ?? 'personal'}
-                      onChange={e => {
-                        const newWs = e.target.value as 'personal' | 'business';
-                        updateIdea(idea.id, { workspace: newWs });
-                        toast.success(newWs === 'business' ? 'Movido para o Workspace da Empresa! 🏢' : 'Movido para o Espaço Pessoal 👤');
-                      }}
-                    >
-                      <option value="personal">👤 Espaço Pessoal</option>
-                      <option value="business">🏢 Workspace Empresarial</option>
-                    </select>
+                    <label className="text-[11px] text-muted-foreground block mb-1">Espaço de Origem (Fixo)</label>
+                    <div className="flex items-center gap-1.5 py-1.5 px-3 rounded-md bg-secondary/60 border border-border/70 text-xs font-semibold select-none">
+                      {idea.workspace === 'business' ? (
+                        <>
+                          <Building2 size={13} className="text-violet shrink-0" />
+                          <span className="text-violet truncate">Iniciativa Corporativa</span>
+                        </>
+                      ) : (
+                        <>
+                          <User size={13} className="text-primary shrink-0" />
+                          <span className="text-foreground truncate">Espaço Pessoal</span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Setor / Departamento</label>
+                    <label className="text-[11px] text-muted-foreground block mb-1">
+                      {idea.workspace === 'business' ? 'Departamento da Empresa' : 'Setor Pessoal'}
+                    </label>
                     <select
-                      className="text-field text-xs py-1.5 w-full"
+                      className="text-field text-xs py-1.5 w-full cursor-pointer"
                       value={idea.sector}
                       onChange={e => {
                         const newSecId = e.target.value;
-                        const allSectors = [
-                          ...data.sectors,
-                          ...(data.companyWorkspace?.sectors ?? defaultCompanySectors),
-                        ];
-                        const secObj = allSectors.find(s => s.id === newSecId);
+                        const applicableSectors = idea.workspace === 'business'
+                          ? (data.companyWorkspace?.sectors ?? defaultCompanySectors)
+                          : data.sectors;
+                        const secObj = applicableSectors.find(s => s.id === newSecId);
                         updateIdea(idea.id, {
                           sector: newSecId,
                           department: secObj ? secObj.name : undefined,
                         });
-                        toast.success('Setor atualizado!');
+                        toast.success(`Setor atualizado para "${secObj?.name || newSecId}"!`);
                       }}
                     >
-                      <optgroup label="Setores Pessoais">
-                        {data.sectors.map(s => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Departamentos da Empresa">
-                        {(data.companyWorkspace?.sectors ?? defaultCompanySectors).map(s => (
+                      {idea.workspace === 'business' ? (
+                        (data.companyWorkspace?.sectors ?? defaultCompanySectors).map(s => (
                           <option key={`biz-${s.id}`} value={s.id}>{s.name}</option>
-                        ))}
-                      </optgroup>
+                        ))
+                      ) : (
+                        data.sectors.map(s => (
+                          <option key={`per-${s.id}`} value={s.id}>{s.name}</option>
+                        ))
+                      )}
                     </select>
                   </div>
 
-                  <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">Responsável na Equipe</label>
-                    <select
-                      className="text-field text-xs py-1.5 w-full"
-                      value={idea.assignedTo ?? ''}
-                      onChange={e => {
-                        const newResp = e.target.value || undefined;
-                        updateIdea(idea.id, { assignedTo: newResp });
-                        toast.success(newResp ? `Atribuído a ${newResp}` : 'Atribuição removida');
-                      }}
-                    >
-                      <option value="">Nenhum (Livre)</option>
-                      {(data.companyWorkspace?.members ?? []).map(m => (
-                        <option key={m.id} value={m.name}>
-                          {m.name} ({m.role})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {idea.workspace === 'business' ? (
+                    <div>
+                      <label className="text-[11px] text-muted-foreground block mb-1">Responsável na Equipe</label>
+                      <select
+                        className="text-field text-xs py-1.5 w-full cursor-pointer"
+                        value={idea.assignedTo ?? ''}
+                        onChange={e => {
+                          const newResp = e.target.value || undefined;
+                          updateIdea(idea.id, { assignedTo: newResp });
+                          toast.success(newResp ? `Atribuído a ${newResp}` : 'Atribuição removida');
+                        }}
+                      >
+                        <option value="">Nenhum (Livre)</option>
+                        {(data.companyWorkspace?.members ?? []).map(m => (
+                          <option key={m.id} value={m.name}>
+                            {m.name} ({m.role})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-[11px] text-muted-foreground block mb-1">Foco</label>
+                      <div className="flex items-center gap-1.5 py-1.5 px-3 rounded-md bg-secondary/30 border border-border/50 text-xs text-muted-foreground">
+                        <span>Realização Pessoal Direta</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
