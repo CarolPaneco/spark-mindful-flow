@@ -596,17 +596,17 @@ export function IdeaDetail({
             )}
           </div>
 
-          <DrawerTitle className="sheet-title mt-2">{idea.title}</DrawerTitle>
-          <DrawerDescription className="mt-2 text-sm text-muted-foreground leading-relaxed">
+          <DrawerTitle className="sheet-title mt-2 text-lg sm:text-2xl font-bold leading-snug">{idea.title}</DrawerTitle>
+          <DrawerDescription className="mt-1.5 text-xs sm:text-sm text-muted-foreground leading-relaxed">
             {idea.summary}
           </DrawerDescription>
 
           {/* Abas de Navegação */}
-          <div className="flex items-center gap-1.5 overflow-x-auto py-2.5 my-4 border-b border-border/70 scrollbar-none">
+          <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-2 my-3 sm:my-4 border-b border-border/70 scrollbar-none">
             <Button
               variant={tab === 'overview' ? 'default' : 'ghost'}
               size="sm"
-              className="h-8 text-xs gap-1.5 shrink-0"
+              className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 shrink-0"
               onClick={() => setTab('overview')}
             >
               <BarChart2 size={13} />
@@ -615,7 +615,7 @@ export function IdeaDetail({
             <Button
               variant={tab === 'steps' ? 'default' : 'ghost'}
               size="sm"
-              className="h-8 text-xs gap-1.5 shrink-0"
+              className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 shrink-0"
               onClick={() => setTab('steps')}
             >
               <ListTodo size={13} />
@@ -624,7 +624,7 @@ export function IdeaDetail({
             <Button
               variant={tab === 'subideas' ? 'default' : 'ghost'}
               size="sm"
-              className="h-8 text-xs gap-1.5 shrink-0"
+              className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 shrink-0"
               onClick={() => setTab('subideas')}
             >
               <FolderTree size={13} className={activeSubIdeas.length > 0 ? 'text-primary' : ''} />
@@ -633,7 +633,7 @@ export function IdeaDetail({
             <Button
               variant={tab === 'pivots' ? 'default' : 'ghost'}
               size="sm"
-              className="h-8 text-xs gap-1.5 shrink-0"
+              className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 shrink-0"
               onClick={() => setTab('pivots')}
             >
               <GitFork size={13} />
@@ -642,7 +642,7 @@ export function IdeaDetail({
             <Button
               variant={tab === 'notes' ? 'default' : 'ghost'}
               size="sm"
-              className="h-8 text-xs gap-1.5 shrink-0"
+              className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 shrink-0"
               onClick={() => setTab('notes')}
             >
               <BookOpen size={13} />
@@ -651,7 +651,7 @@ export function IdeaDetail({
             <Button
               variant={tab === 'calendar' ? 'default' : 'ghost'}
               size="sm"
-              className="h-8 text-xs gap-1.5 shrink-0"
+              className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 shrink-0"
               onClick={() => setTab('calendar')}
             >
               <CalendarDays size={13} />
@@ -660,7 +660,7 @@ export function IdeaDetail({
             <Button
               variant={tab === 'coach' ? 'default' : 'ghost'}
               size="sm"
-              className="h-8 text-xs gap-1.5 shrink-0"
+              className="h-7 sm:h-8 text-[11px] sm:text-xs gap-1 sm:gap-1.5 px-2.5 sm:px-3 shrink-0"
               onClick={() => setTab('coach')}
             >
               <Compass size={13} />
@@ -1137,7 +1137,7 @@ export function IdeaDetail({
               </div>
 
               {/* Lista Interativa de Passos */}
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 {idea.steps.map((step, index) => (
                   <div
                     key={step.id ?? index}
@@ -1150,7 +1150,7 @@ export function IdeaDetail({
                         setDraggedStepIdx(null);
                       }
                     }}
-                    className={`flex items-start gap-2.5 p-3 rounded-lg border transition-all ${
+                    className={`flex items-start gap-1.5 sm:gap-2.5 p-2 sm:p-3 rounded-lg border transition-all ${
                       draggedStepIdx === index
                         ? 'opacity-50 border-primary border-dashed scale-[0.99]'
                         : step.done
@@ -1161,7 +1161,7 @@ export function IdeaDetail({
                     {/* Alça de Arraste e Controles Subir/Descer */}
                     <div className="flex flex-col items-center gap-0.5 shrink-0 pt-0.5 select-none">
                       <div
-                        className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground"
+                        className="hidden sm:block cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground"
                         title="Arraste para cima ou para baixo para reordenar"
                       >
                         <GripVertical size={13} />
@@ -1193,15 +1193,15 @@ export function IdeaDetail({
                       onClick={() => handleToggleStep(index)}
                       title={step.done ? 'Marcar como não feito' : 'Marcar como concluído'}
                     >
-                      {step.done && <Check size={14} className="text-primary" />}
+                      {step.done && <Check size={13} className="text-primary" />}
                     </button>
 
                     <div className="flex-1 min-w-0">
                       {editingStepIndex === index ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <textarea
                             rows={2}
-                            className="text-xs bg-background border border-primary px-2 py-1.5 rounded w-full text-foreground resize-none leading-relaxed break-words"
+                            className="text-[11px] sm:text-xs bg-background border border-primary px-2 py-1 rounded w-full text-foreground resize-none leading-snug break-words"
                             defaultValue={step.text}
                             autoFocus
                             onBlur={e => {
@@ -1213,7 +1213,7 @@ export function IdeaDetail({
                         </div>
                       ) : (
                         <span
-                          className={`text-xs block cursor-pointer select-none leading-relaxed break-words ${
+                          className={`text-[11px] sm:text-xs block cursor-pointer select-none leading-snug break-words ${
                             step.done ? 'line-through text-muted-foreground' : 'text-foreground'
                           }`}
                           onClick={() => handleToggleStep(index)}
@@ -1223,47 +1223,47 @@ export function IdeaDetail({
                       )}
                     </div>
 
-                    <span className="text-[11px] text-muted-foreground font-mono shrink-0 pt-0.5">{step.minutes}m</span>
+                    <span className="text-[10px] sm:text-[11px] text-muted-foreground font-mono shrink-0 pt-0.5">{step.minutes}m</span>
 
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-foreground shrink-0"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
                       title="Editar texto"
                       onClick={() => setEditingStepIndex(editingStepIndex === index ? null : index)}
                     >
-                      <Pencil size={12} />
+                      <Pencil size={11} />
                     </Button>
 
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
                       title="Excluir passo"
                       onClick={() => handleDeleteStep(index)}
                     >
-                      <Trash2 size={13} />
+                      <Trash2 size={12} />
                     </Button>
                   </div>
                 ))}
               </div>
 
               {/* Formulário para Adicionar Novo Passo */}
-              <div className="p-3.5 rounded-lg border border-dashed border-border bg-card/40 mt-4">
-                <span className="text-xs font-semibold text-muted-foreground block mb-2">
+              <div className="p-2.5 sm:p-3.5 rounded-lg border border-dashed border-border bg-card/40 mt-3 sm:mt-4">
+                <span className="text-[11px] sm:text-xs font-semibold text-muted-foreground block mb-1.5">
                   Adicionar Novo Passo
                 </span>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <textarea
                     rows={2}
-                    className="flex-1 bg-background border border-border rounded px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground resize-none leading-relaxed break-words"
+                    className="flex-1 bg-background border border-border rounded px-2.5 py-1.5 text-[11px] sm:text-xs text-foreground placeholder:text-muted-foreground resize-none leading-snug break-words"
                     placeholder="Ex: Agendar reunião de alinhamento com 2 pessoas..."
                     value={newStepText}
                     onChange={e => setNewStepText(e.target.value)}
                   />
                   <div className="flex items-center gap-2 shrink-0">
                     <select
-                      className="w-24 bg-background border border-border rounded px-2 h-8 text-xs"
+                      className="w-20 sm:w-24 bg-background border border-border rounded px-1.5 h-7 sm:h-8 text-[11px] sm:text-xs"
                       value={newStepMinutes}
                       onChange={e => setNewStepMinutes(Number(e.target.value))}
                     >
@@ -1274,8 +1274,8 @@ export function IdeaDetail({
                       <option value={45}>45 min</option>
                       <option value={60}>1h</option>
                     </select>
-                    <Button size="sm" className="h-8 text-xs gap-1" onClick={handleAddStep} disabled={!newStepText.trim()}>
-                      <Plus size={14} />
+                    <Button size="sm" className="h-7 sm:h-8 text-xs gap-1" onClick={handleAddStep} disabled={!newStepText.trim()}>
+                      <Plus size={13} />
                       Adicionar
                     </Button>
                   </div>

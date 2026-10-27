@@ -279,6 +279,22 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   const handleUserLoggedIn = async (currentUser: User) => {
     try {
       setIsSyncing(true);
+
+      // Proteção de isolamento entre contas: se trocou de usuário, limpa resíduos em memória
+      const previousUserId = typeof window !== 'undefined' ? localStorage.getItem('ideaflow_active_user_id') : null;
+      if (previousUserId && previousUserId !== currentUser.id) {
+        setData(prev => ({
+          ...prev,
+          ideas: [],
+          companies: [],
+          companyWorkspace: undefined,
+          activeCompanyId: undefined,
+        }));
+      }
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ideaflow_active_user_id', currentUser.id);
+      }
+
       // Carrega perfil
       const userProfile = await loadUserProfile(currentUser.id);
       const authPin = (currentUser.user_metadata as Record<string, any> | undefined)?.['workspace_pin'];
@@ -351,21 +367,15 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       const companyIdeasArrays = await Promise.all(companyIdeasPromises);
       const companyCloudIdeas = companyIdeasArrays.flat();
 
-      // Mescla com as ideias locais mantendo as mais recentes
+      // Isolamento estrito por conta:
+      // Para um usuário autenticado, suas ideias são ESTRITAMENTE as dele e de suas empresas no Supabase!
+      // Se for uma conta nova (sem ideias no banco), allLoaded será vazio e o usuário começa com conta limpa,
+      // sem herdar ideias de contas anteriores do localStorage.
       const allLoaded = [...cloudIdeas, ...companyCloudIdeas];
-      if (allLoaded.length > 0) {
-        setData(prev => {
-          const map = new Map<string, Idea>();
-          // Adiciona ideias existentes
-          prev.ideas.forEach(i => map.set(i.id, i));
-          // Sobrescreve com as da nuvem
-          allLoaded.forEach(i => map.set(i.id, i));
-          return {
-            ...prev,
-            ideas: Array.from(map.values()),
-          };
-        });
-      }
+      setData(prev => ({
+        ...prev,
+        ideas: allLoaded,
+      }));
     } catch (err) {
       console.warn('Aviso ao sincronizar na inicialização do usuário:', err);
     } finally {
@@ -621,6 +631,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     try {
       sessionStorage.removeItem('ideaflow_session_unlocked');
       localStorage.removeItem('ideaflow-v1');
+      localStorage.removeItem('ideaflow_active_user_id');
       localStorage.removeItem('ideaflow_guest_session');
       localStorage.removeItem('ideaflow_personal_pin');
     } catch {

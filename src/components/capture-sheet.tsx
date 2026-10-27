@@ -586,7 +586,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                   Resumo / Intenção
                 </label>
                 <textarea
-                  className="text-field resize-none text-xs leading-relaxed break-words"
+                  className="text-field resize-none text-[11px] sm:text-xs leading-snug break-words"
                   rows={2}
                   value={draft.summary}
                   onChange={e => setDraft({ ...draft, summary: e.target.value })}
@@ -678,7 +678,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                   Definição do Escopo (O que está incluído no projeto agora?)
                 </label>
                 <textarea
-                  className="text-field resize-none text-xs leading-relaxed break-words"
+                  className="text-field resize-none text-[11px] sm:text-xs leading-snug break-words"
                   rows={2}
                   value={draft.scope ?? ''}
                   onChange={e => setDraft({ ...draft, scope: e.target.value })}
@@ -693,7 +693,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                 </span>
                 <textarea
                   rows={2}
-                  className="w-full bg-transparent border-0 border-b border-amber/30 focus:border-amber text-xs text-foreground mt-2 resize-none outline-none leading-relaxed break-words"
+                  className="w-full bg-transparent border-0 border-b border-amber/30 focus:border-amber text-[11px] sm:text-xs text-foreground mt-2 resize-none outline-none leading-snug break-words"
                   value={draft.immediate}
                   onChange={e => setDraft({ ...draft, immediate: e.target.value })}
                   placeholder="Qual a primeira micro-ação de 15 minutos?"
@@ -701,14 +701,14 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
               </div>
 
               {/* Seção do Plano Inicial Customizável */}
-              <div className="rounded-lg border border-border/70 p-4 bg-card/60">
+              <div className="rounded-lg border border-border/70 p-3 sm:p-4 bg-card/60">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <div>
-                    <h3 className="font-semibold text-sm flex items-center gap-1.5">
-                      <SlidersHorizontal size={15} className="text-primary" />
+                    <h3 className="font-semibold text-xs sm:text-sm flex items-center gap-1.5">
+                      <SlidersHorizontal size={14} className="text-primary" />
                       Seu plano inicial (Personalizável)
                     </h3>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-[11px] sm:text-xs text-muted-foreground">
                       {draft.steps.length} passos · {formatMinutes(draft.minutes)} totais
                     </span>
                   </div>
@@ -718,17 +718,17 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 text-xs px-2 gap-1"
+                      className="h-6 sm:h-7 text-[10px] sm:text-xs px-1.5 sm:px-2 gap-1"
                       title="Gerar passos enxutos para validação rápida"
                       onClick={() => handleRegenerateWithAi('mvp')}
                     >
-                      <Wand2 size={12} className="text-primary" />
+                      <Wand2 size={11} className="text-primary" />
                       MVP
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 text-xs px-2 gap-1"
+                      className="h-6 sm:h-7 text-[10px] sm:text-xs px-1.5 sm:px-2 gap-1"
                       title="Gerar plano completo estruturado"
                       onClick={() => handleRegenerateWithAi('estruturado')}
                     >
@@ -737,7 +737,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-7 text-xs px-2 gap-1"
+                      className="h-6 sm:h-7 text-[10px] sm:text-xs px-1.5 sm:px-2 gap-1"
                       title="Gerar micro-passos rápidos"
                       onClick={() => handleRegenerateWithAi('rapido')}
                     >
@@ -746,7 +746,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                   </div>
                 </div>
 
-                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                <div className="space-y-1.5 sm:space-y-2.5 max-h-72 overflow-y-auto pr-1">
                   {draft.steps.map((s, i) => (
                     <div
                       key={s.id ?? i}
@@ -759,17 +759,17 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                           setDraggedStepIndex(null);
                         }
                       }}
-                      className={`flex items-start gap-2 p-2.5 rounded-lg bg-background/90 border text-xs transition-all ${
+                      className={`flex items-start gap-1.5 sm:gap-2 p-2 sm:p-2.5 rounded-lg bg-background/90 border text-xs transition-all ${
                         draggedStepIndex === i ? 'opacity-50 border-primary border-dashed scale-[0.98]' : 'border-border/60 hover:border-border'
                       }`}
                     >
                       {/* Alça de Arraste e Setas para Subir / Descer */}
                       <div className="flex flex-col items-center gap-0.5 shrink-0 pt-0.5 select-none">
                         <div
-                          className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground"
+                          className="hidden sm:block cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-foreground"
                           title="Arraste para cima ou para baixo para reordenar"
                         >
-                          <GripVertical size={14} />
+                          <GripVertical size={13} />
                         </div>
                         <div className="flex flex-col">
                           <button
@@ -793,20 +793,20 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                         </div>
                       </div>
 
-                      <span className="font-mono text-primary font-bold text-xs min-w-5 pt-1 select-none">
+                      <span className="font-mono text-primary font-bold text-[10px] sm:text-xs min-w-4 pt-1 select-none">
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       <textarea
                         rows={2}
-                        className="flex-1 bg-transparent border-0 border-b border-transparent focus:border-primary/60 px-1 py-1 text-xs text-foreground outline-none resize-none leading-relaxed break-words"
+                        className="flex-1 bg-transparent border-0 border-b border-transparent focus:border-primary/60 px-1 py-0.5 text-[11px] sm:text-xs text-foreground outline-none resize-none leading-snug break-words"
                         value={s.text}
                         onChange={e => handleUpdateStepText(i, e.target.value)}
                         placeholder="Descreva o passo..."
                       />
                       <div className="flex items-center gap-1 shrink-0 pt-1">
-                        <Clock size={12} className="text-muted-foreground" />
+                        <Clock size={11} className="text-muted-foreground" />
                         <select
-                          className="bg-transparent border border-border/60 rounded px-1.5 py-0.5 text-[11px] text-foreground cursor-pointer"
+                          className="bg-transparent border border-border/60 rounded px-1 py-0.5 text-[10px] sm:text-[11px] text-foreground cursor-pointer"
                           value={s.minutes}
                           onChange={e => handleUpdateStepMinutes(i, Number(e.target.value))}
                         >
@@ -826,7 +826,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                         title="Excluir este passo"
                         onClick={() => handleDeleteStep(i)}
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={12} />
                       </Button>
                     </div>
                   ))}
@@ -835,7 +835,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full mt-3 h-8 text-xs border-dashed gap-1 text-muted-foreground hover:text-foreground"
+                  className="w-full mt-2.5 sm:mt-3 h-7 sm:h-8 text-[11px] sm:text-xs border-dashed gap-1 text-muted-foreground hover:text-foreground"
                   onClick={handleAddStep}
                 >
                   <Plus size={13} />

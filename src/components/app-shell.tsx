@@ -563,21 +563,22 @@ export function AppShell({ children }: { children: ReactNode }) {
               </select>
             )}
           </div>
-          <div className="header-right flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Botão de Destaque: Mentor IA */}
+          <div className="header-right flex items-center gap-1 sm:gap-2.5 shrink-0">
+            {/* Botão de Destaque: Mentor IA (compacto no mobile para não espremer o perfil) */}
             <Button
               variant="outline"
               size="sm"
               data-tour="mentor"
-              className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 border-primary/50 bg-gradient-to-r from-primary/20 via-primary/10 to-violet/20 text-primary hover:bg-primary/25 active:scale-95 transition-all shadow-xs hover:shadow-primary/25 px-2.5 sm:px-3.5 rounded-full font-semibold shrink-0 cursor-pointer relative overflow-hidden group"
+              className="h-8 sm:h-9 text-xs sm:text-sm gap-1 sm:gap-1.5 border-primary/50 bg-gradient-to-r from-primary/20 via-primary/10 to-violet/20 text-primary hover:bg-primary/25 active:scale-95 transition-all shadow-xs hover:shadow-primary/25 px-2 sm:px-3.5 rounded-full font-semibold shrink-0 cursor-pointer relative overflow-hidden group"
               onClick={() => {
                 setMentorIdea(null);
                 setAiChatOpen(true);
               }}
+              title="Abrir Mentor IA"
             >
               <span className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-              <Sparkles size={13} className="text-primary animate-pulse" />
-              <span>Mentor IA</span>
+              <Sparkles size={14} className="text-primary animate-pulse" />
+              <span className="hidden sm:inline">Mentor IA</span>
             </Button>
 
             {/* Streak de horas dedicadas (desktop) */}
@@ -605,19 +606,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 sm:h-9 text-xs sm:text-sm gap-1.5 border-primary/40 bg-card hover:bg-primary/10 text-foreground active:scale-95 transition-all px-2.5 sm:px-3.5 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
+                className="h-8 sm:h-9 text-xs sm:text-sm gap-1 border-primary/40 bg-card hover:bg-primary/10 text-foreground active:scale-95 transition-all px-2 sm:px-3 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
                 onClick={() => setAuthOpen(true)}
                 title="Entrar ou criar conta gratuita para sincronizar ideias"
               >
                 <LogIn size={13} className="text-primary" />
-                <span>Entrar</span>
+                <span className="text-[11px] sm:text-xs">Entrar</span>
               </Button>
             ) : (
               /* Indicador de Sincronização na Nuvem (se logado) */
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 sm:h-9 px-2 rounded-full text-xs gap-1.5 text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
+                className="h-8 sm:h-9 px-1.5 sm:px-2 rounded-full text-xs gap-1 text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
                 onClick={() => syncWithCloud()}
                 disabled={isSyncing}
                 title="Sincronizar ideias com Supabase"
@@ -627,29 +628,29 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Button>
             )}
 
-            {/* Avatar / Trigger do Perfil: se logado, mostra avatar com online dot; em desktop quando deslogado também exibe */}
+            {/* Avatar / Trigger do Perfil: SEMPRE visível em mobile e desktop */}
             {user ? (
               <button
                 type="button"
                 onClick={() => setProfileOpen(true)}
-                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none ml-0.5 shrink-0"
-                title="Abrir Meu Perfil"
+                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none shrink-0"
+                title="Abrir Meu Perfil e Empresas"
                 aria-label="Perfil do Usuário"
               >
-                <div className="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-primary via-primary/85 to-violet-600 text-white font-bold flex items-center justify-center text-sm shadow-xs ring-1 ring-primary/40 hover:ring-2 hover:ring-primary/80 transition-all select-none">
+                <div className="w-[32px] h-[32px] sm:w-[34px] sm:h-[34px] rounded-full bg-gradient-to-br from-primary via-primary/85 to-violet-600 text-white font-bold flex items-center justify-center text-xs sm:text-sm shadow-xs ring-2 ring-primary/40 hover:ring-primary/80 transition-all select-none">
                   {userInitial}
                 </div>
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green border-2 border-background shadow-xs shadow-green animate-pulse" />
+                <span className="absolute bottom-0 right-0 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green border-2 border-background shadow-xs shadow-green animate-pulse" />
               </button>
             ) : (
               <button
                 type="button"
-                onClick={() => setAuthOpen(true)}
-                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none ml-0.5 shrink-0 hidden sm:block"
-                title="Fazer Login / Cadastrar"
+                onClick={() => setProfileOpen(true)}
+                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none shrink-0"
+                title="Abrir Perfil"
                 aria-label="Perfil do Usuário"
               >
-                <div className="w-[34px] h-[34px] rounded-full bg-gradient-to-br from-primary/70 to-secondary text-foreground font-bold flex items-center justify-center text-sm border border-border/80 hover:ring-2 hover:ring-primary/60 transition-all select-none">
+                <div className="w-[32px] h-[32px] sm:w-[34px] sm:h-[34px] rounded-full bg-gradient-to-br from-primary/70 to-secondary text-foreground font-bold flex items-center justify-center text-xs sm:text-sm border border-border/80 hover:ring-2 hover:ring-primary/60 transition-all select-none">
                   {userInitial}
                 </div>
               </button>
@@ -660,7 +661,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 sm:h-9 text-xs gap-1.5 border-destructive/35 text-destructive hover:bg-destructive/10 active:scale-95 transition-all px-2.5 sm:px-3 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer ml-1"
+                className="h-8 sm:h-9 text-xs gap-1 border-destructive/35 text-destructive hover:bg-destructive/10 active:scale-95 transition-all px-2 sm:px-3 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
                 onClick={async () => {
                   await signOut();
                   setAuthOpen(true);

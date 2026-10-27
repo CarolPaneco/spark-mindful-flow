@@ -152,6 +152,27 @@ function Settings() {
         </div>
       </div>
 
+      {/* Atalho Acessível para o Perfil e Empresas (Especialmente Mobile) */}
+      <section className="settings-section p-4 rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-card to-violet/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary via-primary/85 to-violet-600 text-white font-bold flex items-center justify-center text-sm shadow-xs shrink-0">
+            <User size={18} />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Meu Perfil & Empresas</h2>
+            <p className="text-xs text-muted-foreground">Gerencie sua foto, bio, equipe, empresas e senha PIN na lateral.</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          className="gap-2 text-xs font-semibold rounded-full px-4 shrink-0 w-full sm:w-auto cursor-pointer"
+          onClick={() => window.dispatchEvent(new CustomEvent('ideaflow:profile'))}
+        >
+          <User size={13} />
+          Abrir Lateral de Perfil
+        </Button>
+      </section>
+
       {/* Tema Claro / Escuro */}
       <section className="settings-section settings-mode">
         <div>
