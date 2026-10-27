@@ -57,6 +57,7 @@ import {
   type Sector,
   type TeamMember,
   type Tone,
+  type CompanyWorkspace,
 } from '@/lib/ideaflow';
 import { toast } from 'sonner';
 
@@ -81,6 +82,8 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
     pendingRequests,
     approveRequest,
     rejectRequest,
+    companies: userCompanies,
+    switchCompany,
   } = useFlow();
   const [activeTab, setActiveTab] = useState<'personal' | 'business'>('personal');
   const [editingPersonal, setEditingPersonal] = useState(false);
@@ -100,14 +103,15 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
   const [role, setRole] = useState(profile.role);
   const [bio, setBio] = useState(profile.bio ?? '');
 
-  // Workspace da Empresa Real (sem mocks ou Acme genérico)
-  const hasCompany = Boolean(
-    data.companyWorkspace &&
-    data.companyWorkspace.id &&
-    data.companyWorkspace.id !== 'company-acme-corp' &&
-    data.companyWorkspace.shareCode !== 'ACME-2026'
-  );
-  const company = hasCompany ? data.companyWorkspace : null;
+  // Workspace das Empresas Reais (suporta múltiplas empresas por conta/email)
+  const validCompanies = (userCompanies && userCompanies.length > 0)
+    ? userCompanies.filter(c => c.id && c.id !== 'company-acme-corp' && c.shareCode !== 'ACME-2026')
+    : (data.companyWorkspace && data.companyWorkspace.id && data.companyWorkspace.id !== 'company-acme-corp' && data.companyWorkspace.shareCode !== 'ACME-2026')
+      ? [data.companyWorkspace]
+      : [];
+
+  const hasCompany = validCompanies.length > 0;
+  const company = hasCompany ? (data.companyWorkspace ?? validCompanies[0]) : null;
   const isBusinessMode = data.workspaceMode === 'business';
 
   const [companyName, setCompanyName] = useState(company?.name ?? '');
@@ -151,16 +155,19 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
 
   const handleSaveCompany = () => {
     if (!company) return;
+    const updatedCompany: CompanyWorkspace = {
+      ...company,
+      name: companyName.trim() || 'Empresa Inovadora',
+      industry: companyIndustry.trim(),
+      mission: companyMission.trim(),
+    };
     setData(prev => {
-      if (!prev.companyWorkspace) return prev;
+      const list = prev.companies && prev.companies.length > 0 ? prev.companies : [updatedCompany];
+      const updatedList = list.map(c => (c.id === updatedCompany.id ? updatedCompany : c));
       return {
         ...prev,
-        companyWorkspace: {
-          ...prev.companyWorkspace,
-          name: companyName.trim() || 'Empresa Inovadora',
-          industry: companyIndustry.trim(),
-          mission: companyMission.trim(),
-        },
+        companyWorkspace: updatedCompany,
+        companies: updatedList,
       };
     });
     setEditingCompany(false);
@@ -191,14 +198,17 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
       name: newSectorName.trim(),
       tone: newSectorTone,
     };
+    const updatedCompany: CompanyWorkspace = {
+      ...company,
+      sectors: [...company.sectors, newSec],
+    };
     setData(prev => {
-      if (!prev.companyWorkspace) return prev;
+      const list = prev.companies && prev.companies.length > 0 ? prev.companies : [updatedCompany];
+      const updatedList = list.map(c => (c.id === updatedCompany.id ? updatedCompany : c));
       return {
         ...prev,
-        companyWorkspace: {
-          ...prev.companyWorkspace,
-          sectors: [...prev.companyWorkspace.sectors, newSec],
-        },
+        companyWorkspace: updatedCompany,
+        companies: updatedList,
       };
     });
     setNewSectorName('');
@@ -208,18 +218,21 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
 
   const handleRemoveCompanySector = (sectorId: string) => {
     if (!company) return;
+    if (company.sectors.length <= 1) {
+      toast.error('A empresa precisa de pelo menos 1 setor.');
+      return;
+    }
+    const updatedCompany: CompanyWorkspace = {
+      ...company,
+      sectors: company.sectors.filter(s => s.id !== sectorId),
+    };
     setData(prev => {
-      if (!prev.companyWorkspace) return prev;
-      if (prev.companyWorkspace.sectors.length <= 1) {
-        toast.error('A empresa precisa de pelo menos 1 setor.');
-        return prev;
-      }
+      const list = prev.companies && prev.companies.length > 0 ? prev.companies : [updatedCompany];
+      const updatedList = list.map(c => (c.id === updatedCompany.id ? updatedCompany : c));
       return {
         ...prev,
-        companyWorkspace: {
-          ...prev.companyWorkspace,
-          sectors: prev.companyWorkspace.sectors.filter(s => s.id !== sectorId),
-        },
+        companyWorkspace: updatedCompany,
+        companies: updatedList,
       };
     });
     toast.info('Setor removido.');
@@ -238,14 +251,17 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
       email: newMemberEmail.trim() || undefined,
       department: newMemberDept,
     };
+    const updatedCompany: CompanyWorkspace = {
+      ...company,
+      members: [...company.members, newMem],
+    };
     setData(prev => {
-      if (!prev.companyWorkspace) return prev;
+      const list = prev.companies && prev.companies.length > 0 ? prev.companies : [updatedCompany];
+      const updatedList = list.map(c => (c.id === updatedCompany.id ? updatedCompany : c));
       return {
         ...prev,
-        companyWorkspace: {
-          ...prev.companyWorkspace,
-          members: [...prev.companyWorkspace.members, newMem],
-        },
+        companyWorkspace: updatedCompany,
+        companies: updatedList,
       };
     });
     setNewMemberName('');
@@ -257,14 +273,17 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
 
   const handleRemoveMember = (memberId: string) => {
     if (!company) return;
+    const updatedCompany: CompanyWorkspace = {
+      ...company,
+      members: company.members.filter(m => m.id !== memberId),
+    };
     setData(prev => {
-      if (!prev.companyWorkspace) return prev;
+      const list = prev.companies && prev.companies.length > 0 ? prev.companies : [updatedCompany];
+      const updatedList = list.map(c => (c.id === updatedCompany.id ? updatedCompany : c));
       return {
         ...prev,
-        companyWorkspace: {
-          ...prev.companyWorkspace,
-          members: prev.companyWorkspace.members.filter(m => m.id !== memberId),
-        },
+        companyWorkspace: updatedCompany,
+        companies: updatedList,
       };
     });
     toast.info('Colaborador removido da equipe.');
@@ -922,6 +941,104 @@ export function ProfileSidebar({ open, onClose, onOpenIdea }: ProfileSidebarProp
                 </div>
               ) : (
                 <>
+                  {/* Seletor & Lista de Empresas do Usuário (Multi-Empresa) */}
+                  <div className="p-4 rounded-xl border border-violet/30 bg-violet/5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Building2 size={16} className="text-violet" />
+                        <div>
+                          <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                            Minhas Empresas ({validCompanies.length})
+                          </h4>
+                          <p className="text-[11px] text-muted-foreground">
+                            {validCompanies.length > 1
+                              ? 'Alterne entre suas diferentes organizações cadastradas.'
+                              : 'Organização conectada a este usuário.'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs border-violet/40 text-violet hover:bg-violet/15 cursor-pointer px-2 gap-1"
+                          onClick={() => openCompanyAccessModal('create')}
+                          title="Cadastrar outra empresa como Key User"
+                        >
+                          <Plus size={12} />
+                          <span>Nova</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs border-violet/40 text-violet hover:bg-violet/15 cursor-pointer px-2 gap-1"
+                          onClick={() => openCompanyAccessModal('join')}
+                          title="Entrar em outra empresa com código"
+                        >
+                          <Share2 size={12} />
+                          <span>Entrar</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      {validCompanies.map(c => {
+                        const isActive = company?.id === c.id;
+                        return (
+                          <div
+                            key={c.id}
+                            className={`p-3 rounded-lg border transition-all flex items-center justify-between gap-3 ${
+                              isActive
+                                ? 'bg-card border-violet/60 shadow-xs ring-1 ring-violet/40'
+                                : 'bg-background/80 border-border/70 hover:border-violet/40'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-xs text-foreground truncate">{c.name}</span>
+                                {isActive && (
+                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet/20 text-violet border border-violet/30 shrink-0">
+                                    ✓ Ativa
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-secondary text-muted-foreground shrink-0">
+                                  {c.isKeyUser ? '👑 Key User' : '👤 Colaborador'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1">
+                                <span className="font-mono">#{c.shareCode}</span>
+                                <span>•</span>
+                                <span>{c.sectors?.length ?? 0} setores</span>
+                                <span>•</span>
+                                <span>{c.members?.length ?? 0} colaboradores</span>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 flex items-center gap-1.5">
+                              {isActive ? (
+                                <span className="text-xs font-semibold text-violet px-2.5 py-1">Selecionada</span>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs border-primary/30 text-primary hover:bg-primary/10 cursor-pointer px-2.5"
+                                  onClick={async () => {
+                                    if (c.id) {
+                                      await switchCompany(c.id);
+                                      toast.success(`Alternado para ${c.name} 🏢`);
+                                    }
+                                  }}
+                                >
+                                  Alternar
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Card Destaque: Alternador de Modo de Workspace */}
                   <div
                     className={`p-4 rounded-xl border transition-all ${

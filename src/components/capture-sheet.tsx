@@ -30,6 +30,7 @@ import {
   formatMinutes,
   generateAiSteps,
   FIVE_WHYS_QUESTIONS,
+  getFiveWhysQuestions,
   suggestFiveWhysOffline,
   defaultCompanySectors,
   defaultTeamMembers,
@@ -68,6 +69,9 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
   const [showFiveWhys, setShowFiveWhys] = useState(false);
   const [suggestingWhys, setSuggestingWhys] = useState(false);
   const recognition = useRef<SpeechRecognizer | null>(null);
+
+  const isBusinessMode = (data.workspaceMode ?? 'personal') === 'business';
+  const currentWhysQuestions = getFiveWhysQuestions(isBusinessMode);
 
   // Detecção de Desktop (>= 769px) para abrir modal imersivo e espaçoso no Web
   const [isDesktop, setIsDesktop] = useState<boolean>(() => {
@@ -264,10 +268,14 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
         toast.success('5 Porquês gerados com IA! Você pode editar as respostas.');
       }
     } catch {
-      const offline = suggestFiveWhysOffline(text);
+      const offline = suggestFiveWhysOffline(text, isBusinessMode);
       setFiveWhys(offline);
       setShowFiveWhys(true);
-      toast.success('5 Porquês reflexivos gerados pelo motor local!');
+      toast.success(
+        isBusinessMode
+          ? 'Perguntas estratégicas preenchidas pelo motor local da empresa! 🏢'
+          : '5 Porquês reflexivos gerados pelo motor local!'
+      );
     } finally {
       setSuggestingWhys(false);
     }
@@ -321,6 +329,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
     const finalIdea: Idea = {
       ...draft,
       workspace: isBusiness ? 'business' : 'personal',
+      companyId: isBusiness && data.companyWorkspace?.id ? data.companyWorkspace.id : undefined,
       department: isBusiness
         ? (activeSectors.find(s => s.id === draft.sector)?.name ?? draft.sector)
         : undefined,
@@ -421,13 +430,15 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                     </span>
                     <div>
                       <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                        Técnica dos 5 Porquês
+                        {isBusinessMode ? '5 Porquês Corporativos (Alinhamento Estratégico)' : 'Técnica dos 5 Porquês'}
                         <span className="text-[10.5px] font-medium px-1.5 py-0.2 rounded-full bg-secondary text-primary border border-primary/25">
                           {fiveWhys.filter(w => w.trim()).length}/5 preenchidos
                         </span>
                       </h4>
                       <p className="text-[11px] text-muted-foreground">
-                        Responda para a IA entender o contexto e a raiz da ideia, gerando passos muito mais precisos.
+                        {isBusinessMode
+                          ? 'Responda para a IA calcular impacto no negócio, ROI, setor responsável e um plano ágil de entrega.'
+                          : 'Responda para a IA entender o contexto e a raiz da ideia, gerando passos muito mais precisos.'}
                       </p>
                     </div>
                   </div>
@@ -471,7 +482,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
 
                 {showFiveWhys && (
                   <div className="mt-3.5 space-y-3 pt-3 border-t border-border/60 animate-in fade-in-50 duration-200">
-                    {FIVE_WHYS_QUESTIONS.map((q, idx) => (
+                    {currentWhysQuestions.map((q, idx) => (
                       <div key={q.step} className="space-y-1">
                         <label className="text-[11px] font-medium text-foreground flex items-center justify-between">
                           <span>
@@ -541,7 +552,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                   <div className="flex items-center justify-between text-xs font-semibold text-primary mb-1">
                     <span className="flex items-center gap-1.5">
                       <Sparkles size={13} />
-                      Contexto Raiz Aplicado (5 Porquês)
+                      {isBusinessMode ? 'Alinhamento Estratégico Aplicado (5 Porquês)' : 'Contexto Raiz Aplicado (5 Porquês)'}
                     </span>
                     <span className="text-[10px] text-muted-foreground">
                       {draft.fiveWhys.length} respostas registradas

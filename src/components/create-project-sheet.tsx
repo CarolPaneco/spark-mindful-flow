@@ -32,6 +32,7 @@ import {
   detectSectorFromTitle,
   formatMinutes,
   FIVE_WHYS_QUESTIONS,
+  getFiveWhysQuestions,
   suggestFiveWhysOffline,
   defaultCompanySectors,
   defaultTeamMembers,
@@ -59,6 +60,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
   const { data, setData } = useFlow();
 
   const isBusiness = data.workspaceMode === 'business';
+  const currentWhysQuestions = getFiveWhysQuestions(isBusiness);
   const activeSectors = isBusiness
     ? (data.companyWorkspace?.sectors ?? defaultCompanySectors)
     : data.sectors;
@@ -194,10 +196,14 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
         toast.success('5 Porquês gerados com IA! Você pode editar as respostas.');
       }
     } catch {
-      const offline = suggestFiveWhysOffline(`${title}. ${summary}`);
+      const offline = suggestFiveWhysOffline(`${title}. ${summary}`, isBusiness);
       setFiveWhys(offline);
       setShowFiveWhys(true);
-      toast.success('5 Porquês sugeridos com sucesso!');
+      toast.success(
+        isBusiness
+          ? 'Perguntas estratégicas do projeto preenchidas pela IA! 🏢'
+          : '5 Porquês sugeridos com sucesso!'
+      );
     } finally {
       setSuggestingWhys(false);
     }
@@ -265,6 +271,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
         stage: 0,
         parentId: projectId,
         workspace: isBusiness ? 'business' : 'personal',
+        companyId: isBusiness && data.companyWorkspace?.id ? data.companyWorkspace.id : undefined,
         department: isBusiness
           ? (activeSectors.find(s => s.id === sector)?.name ?? sector)
           : undefined,
@@ -311,6 +318,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
       stage: 0,
       isProject: true,
       workspace: isBusiness ? 'business' : 'personal',
+      companyId: isBusiness && data.companyWorkspace?.id ? data.companyWorkspace.id : undefined,
       department: isBusiness
         ? (activeSectors.find(s => s.id === sector)?.name ?? sector)
         : undefined,
@@ -496,13 +504,15 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
                     </span>
                     <div>
                       <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                        Técnica dos 5 Porquês do Projeto
+                        {isBusiness ? '5 Porquês Corporativos do Projeto' : 'Técnica dos 5 Porquês do Projeto'}
                         <span className="text-[10.5px] font-medium px-1.5 py-0.2 rounded-full bg-secondary text-primary border border-primary/25">
                           {fiveWhys.filter(w => w.trim()).length}/5 preenchidos
                         </span>
                       </h4>
                       <p className="text-[11px] text-muted-foreground">
-                        Defina o propósito raiz para a IA sugerir frentes de trabalho cirúrgicas.
+                        {isBusiness
+                          ? 'Alinhe a meta estratégica, ROI e recursos para a IA sugerir frentes de trabalho da equipe.'
+                          : 'Defina o propósito raiz para a IA sugerir frentes de trabalho cirúrgicas.'}
                       </p>
                     </div>
                   </div>
@@ -546,7 +556,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
 
                 {showFiveWhys && (
                   <div className="mt-3.5 space-y-3 pt-3 border-t border-border/60 animate-in fade-in-50 duration-200">
-                    {FIVE_WHYS_QUESTIONS.map((q, idx) => (
+                    {currentWhysQuestions.map((q, idx) => (
                       <div key={q.step} className="space-y-1">
                         <label className="text-[11px] font-medium text-foreground flex items-center justify-between">
                           <span>

@@ -117,6 +117,8 @@ export interface FlowData {
   profile?: UserProfile | undefined;
   workspaceMode?: WorkspaceType | undefined;
   companyWorkspace?: CompanyWorkspace | undefined;
+  companies?: CompanyWorkspace[] | undefined; // Todas as empresas vinculadas ao usuário (proprietário ou membro)
+  activeCompanyId?: string | undefined; // ID da empresa ativa no momento
 }
 
 export const stageNames = ['Faísca', 'Estrutura', 'Em Fluxo', 'Ajustes', 'Realidade'];
@@ -307,7 +309,7 @@ export function createStarterBusinessIdeas(): Idea[] {
   ];
 }
 
-export const FIVE_WHYS_QUESTIONS = [
+export const FIVE_WHYS_QUESTIONS_PERSONAL = [
   {
     step: 1,
     title: '1º Por quê: O Objetivo Raiz',
@@ -329,8 +331,8 @@ export const FIVE_WHYS_QUESTIONS = [
   {
     step: 4,
     title: '4º Por quê: O Impacto Real',
-    question: 'Por que o sucesso dessa ideia fará diferença de verdade?',
-    placeholder: 'Ex: Vai gerar autonomia, realização pessoal ou ajudar clientes...',
+    question: 'Por que o sucesso dessa ideia fará diferença de verdade na sua vida?',
+    placeholder: 'Ex: Vai gerar autonomia, realização pessoal ou ajudar pessoas...',
   },
   {
     step: 5,
@@ -340,8 +342,84 @@ export const FIVE_WHYS_QUESTIONS = [
   },
 ] as const;
 
-export function suggestFiveWhysOffline(titleOrText: string): string[] {
+export const FIVE_WHYS_QUESTIONS_BUSINESS = [
+  {
+    step: 1,
+    title: '1º Por quê: Impacto Estratégico',
+    question: 'Qual objetivo estratégico ou meta corporativa essa iniciativa atende?',
+    placeholder: 'Ex: Reduzir tempo de resposta ao cliente, aumentar conversão em 15% ou eliminar gargalo...',
+  },
+  {
+    step: 2,
+    title: '2º Por quê: Dor do Cliente ou Ineficiência Interna',
+    question: 'Qual problema real do cliente ou gargalo de processo estamos resolvendo?',
+    placeholder: 'Ex: Retrabalho manual de planilhas consome 6 horas semanais do time...',
+  },
+  {
+    step: 3,
+    title: '3º Por quê: Setor Responsável & Recursos',
+    question: 'Qual departamento deve liderar a execução e quais dependências existem?',
+    placeholder: 'Ex: Tecnologia & Dev lidera com apoio de Qualidade para validação das regras...',
+  },
+  {
+    step: 4,
+    title: '4º Por quê: Retorno Esperado (ROI & Eficiência)',
+    question: 'Qual métrica quantificável comprovará o sucesso da entrega?',
+    placeholder: 'Ex: Redução de 30% em chamados de suporte, economia de R$ 15k ou ganho de SLA...',
+  },
+  {
+    step: 5,
+    title: '5º Por quê: Escopo do MVP Corporativo',
+    question: 'Por que validar esta versão enxuta antes de expandir o escopo?',
+    placeholder: 'Ex: Permite homologar com 1 departamento piloto sem risco operacional...',
+  },
+] as const;
+
+export const FIVE_WHYS_QUESTIONS = FIVE_WHYS_QUESTIONS_PERSONAL;
+
+export function getFiveWhysQuestions(isBusiness?: boolean) {
+  return isBusiness ? FIVE_WHYS_QUESTIONS_BUSINESS : FIVE_WHYS_QUESTIONS_PERSONAL;
+}
+
+export function suggestFiveWhysOffline(titleOrText: string, isBusiness?: boolean): string[] {
   const lower = (titleOrText || '').toLowerCase();
+
+  if (isBusiness) {
+    if (/sistema|app|dev|software|api|banco|infra|deploy|bug|qa|teste/.test(lower)) {
+      return [
+        'Aumentar a confiabilidade técnica, reduzir tempo de deploy e elevar a segurança dos dados da empresa.',
+        'A equipe e os clientes enfrentam lentidão ou risco de instabilidade na operação atual.',
+        'Tecnologia & Dev lidera a implementação com alinhamento contínuo com Qualidade & QA.',
+        'Redução drástica de falhas em produção (SLO de 99.9%) e maior agilidade nas entregas de produto.',
+        'Entregar um piloto controlado com testes automatizados valida o ganho sem parar a operação.',
+      ];
+    }
+    if (/venda|marketing|growth|lead|cliente|convers|campanha|receita/.test(lower)) {
+      return [
+        'Acelerar a aquisição qualificada de clientes e expandir a receita recorrente da empresa.',
+        'Canais atuais atingiram teto de eficiência e o mercado demanda inovação no posicionamento.',
+        'Marketing & Growth conduz com apoio de Vendas e Produto para garantir fechamentos rápidos.',
+        'Crescimento de 20% no pipeline de oportunidades e diminuição do Custo de Aquisição (CAC).',
+        'Lançar uma campanha-piloto de 15 dias valida a conversão com baixo orçamento inicial.',
+      ];
+    }
+    if (/processo|rh|treinamento|onboard|equipe|contrat|operaç/.test(lower)) {
+      return [
+        'Padronizar fluxos internos, elevar o engajamento do time e diminuir o tempo de integração de colaboradores.',
+        'O crescimento da empresa tornou a comunicação dispersa e aumentou o retrabalho dos setores.',
+        'Operações & RH lidera com participação ativa dos líderes de cada departamento.',
+        'Redução de 40% nas dúvidas rotineiras e colaboradores 100% autônomos em metade do tempo.',
+        'Começar com um manual vivo e checklist de 1 página garante adoção imediata por todos.',
+      ];
+    }
+    return [
+      'Alinhar a iniciativa aos objetivos estratégicos do trimestre para gerar valor corporativo real.',
+      'Existe um gargalo claro afetando clientes ou a produtividade dos colaboradores hoje.',
+      'O departamento responsável possui capacidade para executar em sprints curtas e ágeis.',
+      'Gera retorno palpável em produtividade, economia de tempo ou receita para o negócio.',
+      'Executar um MVP enxuto valida a eficácia antes de alocar recursos adicionais do orçamento.',
+    ];
+  }
 
   if (/bolo|receita|culin|cozinh|doce|pão|restaurante|café|comida/.test(lower)) {
     return [

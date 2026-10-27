@@ -267,7 +267,161 @@ export const READY_SECTOR_TEMPLATES: SectorTemplate[] = [
 /**
  * Instancia as ideias modelo para um setor específico.
  */
-export function buildStarterIdeasForSector(sectorId: string, template: SectorTemplate): Idea[] {
+export const READY_COMPANY_SECTOR_TEMPLATES: SectorTemplate[] = [
+  {
+    id: 'tech_dev',
+    name: 'Tecnologia & Dev',
+    tone: 'cyan',
+    iconName: 'tech',
+    description: 'Engenharia de software, automação de infraestrutura, escalabilidade de microsserviços e APIs.',
+    starterIdeas: [
+      {
+        title: 'Otimização de Performance & Redução de Latência de APIs',
+        summary: 'Mapear rotas críticas do sistema e aplicar cache para garantir tempo de resposta abaixo de 200ms.',
+        priority: 'Importante',
+        immediate: 'Listar as 3 rotas com maior tempo de resposta nos logs do servidor.',
+        clarity: 'Sistemas rápidos e estáveis constroem confiança imediata com clientes corporativos.',
+        scope: 'Auditoria de gargalos em banco de dados, camada de cache Redis e testes de carga simulando pico.',
+        minutes: 120,
+        steps: [
+          { text: 'Identificar as 3 rotas mais lentas nos logs de produção', minutes: 25 },
+          { text: 'Implementar camada de cache em memória para leituras repetidas', minutes: 45 },
+          { text: 'Criar índices otimizados no banco de dados', minutes: 30 },
+          { text: 'Executar teste de carga e documentar o ganho de latência', minutes: 20 },
+        ],
+      },
+      {
+        title: 'Automação de CI/CD & Deploy Contínuo com Zero Downtime',
+        summary: 'Configurar esteira automatizada para validar testes e publicar novas versões com segurança total.',
+        priority: 'Urgente',
+        immediate: 'Desenhar o fluxo ideal da esteira (Lint -> Testes -> Homologação -> Produção).',
+        clarity: 'Deploys automatizados eliminam o estresse de entregas e previnem erros manuais.',
+        scope: 'Pipeline de integração contínua rodando testes unitários e lint a cada push.',
+        minutes: 90,
+        steps: [
+          { text: 'Criar arquivo de configuração de workflow de CI/CD', minutes: 25 },
+          { text: 'Integrar suíte de testes automáticos com bloqueio de merge em caso de falha', minutes: 30 },
+          { text: 'Configurar notificações de status no canal da equipe', minutes: 15 },
+          { text: 'Testar 1 deploy de ponta a ponta simulado', minutes: 20 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'qualidade_produto',
+    name: 'Qualidade & Produto',
+    tone: 'green',
+    iconName: 'business',
+    description: 'Product Discovery, pesquisa contínua com clientes, Design System e validação de roadmap.',
+    starterIdeas: [
+      {
+        title: 'Discovery Contínuo & Entrevistas com Clientes-Chave',
+        summary: 'Entrevistar 5 clientes reais para entender suas maiores dores na rotina com nossa solução.',
+        priority: 'Urgente',
+        immediate: 'Elaborar roteiro de 5 perguntas abertas focadas em problemas reais.',
+        clarity: 'Construir o que os clientes realmente precisam evita meses de desenvolvimento desperdiçado.',
+        scope: 'Roteiro de entrevista, realização de 5 conversas e relatório de síntese de oportunidades.',
+        minutes: 100,
+        steps: [
+          { text: 'Redigir roteiro de 5 perguntas abertas sobre fluxo de trabalho do cliente', minutes: 20 },
+          { text: 'Agendar e conduzir as 3 primeiras entrevistas de 20 minutos', minutes: 45 },
+          { text: 'Sintetizar padrões de dores e oportunidades em 1 página executiva', minutes: 25 },
+          { text: 'Apresentar conclusões para o time de tecnologia e liderança', minutes: 10 },
+        ],
+      },
+      {
+        title: 'Padronização do Design System & Consistência de UI/UX',
+        summary: 'Alinhar componentes visuais, tipografia e estados de botão para agilizar a criação de novas telas.',
+        priority: 'Normal',
+        immediate: 'Catalogar os 5 componentes mais usados no aplicativo (botões, inputs, cards, modais).',
+        clarity: 'Um Design System consistente reduz tempo de desenvolvimento em 40% e eleva a percepção de valor.',
+        scope: 'Biblioteca de componentes documentada e aplicada nas páginas centrais.',
+        minutes: 80,
+        steps: [
+          { text: 'Catalogar discrepâncias visuais nos componentes atuais', minutes: 20 },
+          { text: 'Definir tokens de cores, espaçamentos e variantes de botões', minutes: 30 },
+          { text: 'Aplicar a padronização no fluxo principal da aplicação', minutes: 30 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'marketing_growth',
+    name: 'Marketing & Growth',
+    tone: 'pink',
+    iconName: 'creative',
+    description: 'Aquisição de clientes, campanhas de tração, nutrição de leads e métricas de conversão.',
+    starterIdeas: [
+      {
+        title: 'Otimização da Página de Apresentação & Conversão de Leads',
+        summary: 'Reestruturar títulos, prova social e botões de ação para aumentar a taxa de conversão em 25%.',
+        priority: 'Urgente',
+        immediate: 'Reescrever a promessa principal da primeira dobra em 1 frase clara e impactante.',
+        clarity: 'Clareza vende mais que complexidade: o cliente precisa entender o benefício em 5 segundos.',
+        scope: 'Nova versão da página com proposta de valor direta, depoimentos e formulário simplificado.',
+        minutes: 90,
+        steps: [
+          { text: 'Definir a nova proposta de valor central e call-to-action primário', minutes: 20 },
+          { text: 'Incluir 3 depoimentos reais e selos de segurança/confiabilidade', minutes: 25 },
+          { text: 'Implementar as melhorias visuais e testar responsividade mobile', minutes: 30 },
+          { text: 'Medir a taxa de conversão por 7 dias comparando com o período anterior', minutes: 15 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'testes_qa',
+    name: 'Testes & QA',
+    tone: 'amber',
+    iconName: 'tech',
+    description: 'Garantia de qualidade contínua, testes E2E nos fluxos críticos e prevenção de regressões.',
+    starterIdeas: [
+      {
+        title: 'Cobertura de Testes Automatizados nos Fluxos Críticos',
+        summary: 'Criar testes automatizados para login, cadastro e criação de iniciativas para evitar quebras.',
+        priority: 'Importante',
+        immediate: 'Listar os 3 fluxos que nunca podem quebrar em produção.',
+        clarity: 'Qualidade não é um evento antes do release, é um hábito contínuo da engenharia.',
+        scope: 'Suíte de testes de regressão executando antes de cada versão ser liberada.',
+        minutes: 90,
+        steps: [
+          { text: 'Escrever casos de teste para o fluxo de autenticação e permissões', minutes: 30 },
+          { text: 'Escrever casos de teste para captura e persistência de dados', minutes: 35 },
+          { text: 'Configurar relatório automático de cobertura de código', minutes: 25 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'operacoes_rh',
+    name: 'Operações & Pessoas',
+    tone: 'violet',
+    iconName: 'relationship',
+    description: 'Gestão de processos organizacionais, onboarding de talentos e comunicação transparente.',
+    starterIdeas: [
+      {
+        title: 'Manual Vivo de Onboarding de Novos Colaboradores',
+        summary: 'Montar checklist claro para novos membros começarem a produzir com autonomia em até 48 horas.',
+        priority: 'Importante',
+        immediate: 'Listar os 5 primeiros acessos e ferramentas necessárias para o novo colaborador.',
+        clarity: 'Um bom onboarding reduz ansiedade, eleva o pertencimento e acelera resultados do time.',
+        scope: 'Documento centralizado com missão, links úteis, contatos-chave e tarefas da primeira semana.',
+        minutes: 75,
+        steps: [
+          { text: 'Listar acessos obrigatórios e ferramentas de comunicação', minutes: 20 },
+          { text: 'Redigir guia dos primeiros 3 dias com missões práticas e mentor de apoio', minutes: 35 },
+          { text: 'Validar o guia com o último membro contratado para coletar feedback', minutes: 20 },
+        ],
+      },
+    ],
+  },
+];
+
+export function getReadySectorTemplates(isBusiness?: boolean): SectorTemplate[] {
+  return isBusiness ? READY_COMPANY_SECTOR_TEMPLATES : READY_SECTOR_TEMPLATES;
+}
+
+export function buildStarterIdeasForSector(sectorId: string, template: SectorTemplate, workspace: 'personal' | 'business' = 'personal'): Idea[] {
   return template.starterIdeas.map((seed, idx) => {
     const ideaId = crypto.randomUUID();
     const steps: Step[] = seed.steps.map((st, stepIdx) => ({
@@ -290,12 +444,13 @@ export function buildStarterIdeasForSector(sectorId: string, template: SectorTem
       immediate: seed.immediate,
       clarity: seed.clarity,
       scope: seed.scope,
+      workspace,
       pivots: [],
       notes: [
         {
           id: `note-${ideaId}-init`,
           createdAt: new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-          text: `Ideia iniciada a partir do modelo oficial de ${template.name}! Pronto para agir. 🚀`,
+          text: `Iniciativa criada a partir do modelo oficial de ${template.name}! 🚀`,
         },
       ],
     };

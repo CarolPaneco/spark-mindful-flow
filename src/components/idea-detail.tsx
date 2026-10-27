@@ -53,6 +53,7 @@ import {
   getProjectStats,
   generateSubModulesAi,
   FIVE_WHYS_QUESTIONS,
+  getFiveWhysQuestions,
   suggestFiveWhysOffline,
   defaultCompanySectors,
   defaultTeamMembers,
@@ -143,6 +144,9 @@ export function IdeaDetail({
     toast.success('5 Porquês atualizados com sucesso! 🎯');
   };
 
+  const isBusinessIdea = idea?.workspace === 'business' || data.workspaceMode === 'business';
+  const currentWhysQuestions = getFiveWhysQuestions(isBusinessIdea);
+
   const handleSuggestWhysInDetail = async () => {
     if (!idea) return;
     setIsSuggestingWhysDetail(true);
@@ -150,12 +154,20 @@ export function IdeaDetail({
       const suggestions = await suggestFiveWhysWithAi(`${idea.title}. ${idea.summary}`);
       if (suggestions && suggestions.length > 0) {
         setLocalFiveWhys(suggestions);
-        toast.success('5 Porquês sugeridos com IA! Você pode editar as respostas.');
+        toast.success(
+          isBusinessIdea
+            ? 'Perguntas estratégicas sugeridas com IA! 🏢'
+            : '5 Porquês sugeridos com IA! Você pode editar as respostas.'
+        );
       }
     } catch {
-      const offline = suggestFiveWhysOffline(`${idea.title}. ${idea.summary}`);
+      const offline = suggestFiveWhysOffline(`${idea.title}. ${idea.summary}`, isBusinessIdea);
       setLocalFiveWhys(offline);
-      toast.success('5 Porquês sugeridos pelo motor reflexivo!');
+      toast.success(
+        isBusinessIdea
+          ? 'Perguntas estratégicas sugeridas pelo motor local da empresa! 🏢'
+          : '5 Porquês sugeridos pelo motor reflexivo!'
+      );
     } finally {
       setIsSuggestingWhysDetail(false);
     }
@@ -889,13 +901,15 @@ export function IdeaDetail({
                     </span>
                     <div>
                       <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                        Propósito Raiz: Técnica dos 5 Porquês
+                        {isBusinessIdea ? 'Alinhamento Estratégico (5 Porquês da Empresa)' : 'Propósito Raiz: Técnica dos 5 Porquês'}
                         <span className="text-[10px] text-muted-foreground font-normal">
                           ({(idea.fiveWhys || []).filter(w => w.trim()).length}/5 respondidos)
                         </span>
                       </h4>
                       <p className="text-[11px] text-muted-foreground">
-                        A motivação profunda e os obstáculos que guiam o plano de ação desta realização.
+                        {isBusinessIdea
+                          ? 'Métricas de negócio, ROI, dor do cliente e viabilidade que orientam esta iniciativa.'
+                          : 'A motivação profunda e os obstáculos que guiam o plano de ação desta realização.'}
                       </p>
                     </div>
                   </div>
@@ -916,7 +930,7 @@ export function IdeaDetail({
 
                 {editingFiveWhys ? (
                   <div className="space-y-3 pt-2 border-t border-border/60 animate-in fade-in-50 duration-200">
-                    {FIVE_WHYS_QUESTIONS.map((q, idx) => (
+                    {currentWhysQuestions.map((q, idx) => (
                       <div key={q.step} className="space-y-1">
                         <label className="text-[11px] font-medium text-foreground block">
                           <strong className="text-primary mr-1">{q.step}º Por quê:</strong>
@@ -964,7 +978,7 @@ export function IdeaDetail({
                     {idea.fiveWhys && idea.fiveWhys.some(w => w.trim()) ? (
                       <div className="grid grid-cols-1 gap-2">
                         {idea.fiveWhys.map((why, idx) => {
-                          const q = FIVE_WHYS_QUESTIONS[idx];
+                          const q = currentWhysQuestions[idx];
                           if (!why.trim()) return null;
                           return (
                             <div key={idx} className="p-2.5 rounded-lg bg-secondary/40 border border-border/50 text-xs">

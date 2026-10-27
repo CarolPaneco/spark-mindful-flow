@@ -97,7 +97,9 @@ export default defineConfig(({ command }) => ({
     tsconfigPaths(),
     command === "build"
       ? nitro({
-          defaultPreset: "node-server",
+          defaultPreset:
+            process.env["NITRO_PRESET"] ||
+            (process.env["NETLIFY"] ? "netlify" : "node-server"),
         })
       : null,
     VitePWA({

@@ -38,6 +38,7 @@ import { IdeaDetail } from '@/components/idea-detail';
 import { FocusTimer } from '@/components/focus-timer';
 import {
   READY_SECTOR_TEMPLATES,
+  getReadySectorTemplates,
   buildStarterIdeasForSector,
   type SectorTemplate,
 } from '@/lib/sector-templates';
@@ -132,6 +133,7 @@ function Sectors() {
 
   const isBusiness = data.workspaceMode === 'business';
   const company = data.companyWorkspace;
+  const readyTemplates = getReadySectorTemplates(isBusiness);
   const currentSectors = isBusiness && company ? company.sectors : data.sectors;
   const workspaceIdeas = data.ideas.filter(i => isBusiness ? i.workspace === 'business' : i.workspace !== 'business');
 
@@ -302,7 +304,7 @@ function Sectors() {
 
             {/* Grid dos Modelos Prontos da Missão */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-              {READY_SECTOR_TEMPLATES.map(tmpl => {
+              {readyTemplates.map(tmpl => {
                 const Icon = getTemplateIcon(tmpl.iconName);
                 return (
                   <div
@@ -782,16 +784,18 @@ function Sectors() {
               <div>
                 <DrawerTitle className="sheet-title flex items-center gap-2">
                   <Sparkles size={18} className="text-amber" />
-                  Modelos Prontos de Setores
+                  {isBusiness ? 'Modelos de Departamentos da Empresa' : 'Modelos Prontos de Setores'}
                 </DrawerTitle>
                 <DrawerDescription className="mt-1">
-                  Comece instantaneamente com setores inspiradores e ideias já desenhadas para agir.
+                  {isBusiness
+                    ? 'Adicione departamentos estratégicos com iniciativas corporativas prontas para a equipe executar.'
+                    : 'Comece instantaneamente com setores inspiradores e ideias já desenhadas para agir.'}
                 </DrawerDescription>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-              {READY_SECTOR_TEMPLATES.map(tmpl => {
+              {readyTemplates.map(tmpl => {
                 const Icon = getTemplateIcon(tmpl.iconName);
                 const isAlreadyAdded = data.sectors.some(
                   s => s.name.toLowerCase() === tmpl.name.toLowerCase()

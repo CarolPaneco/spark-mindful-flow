@@ -23,6 +23,7 @@ export interface AuthProfile {
   avatar_url?: string | undefined;
   sectors?: any[] | undefined;
   company_workspace?: any | undefined;
+  workspace_pin?: string | undefined;
 }
 
 /**
@@ -255,6 +256,47 @@ export async function upsertUserProfile(profile: AuthProfile): Promise<void> {
 }
 
 /**
+ * Salva a senha de segurança de transição de workspace (Empresa <-> Pessoal) no Supabase
+ */
+export async function saveUserWorkspacePin(userId: string, pin: string | null): Promise<void> {
+  const cleanPin = pin ? pin.trim() : '';
+  try {
+    // 1. Salva nos metadados de autenticação do usuário no Supabase (Auth user_metadata)
+    try {
+      const { data: authData, error: authError } = await supabase.auth.updateUser({
+        data: { workspace_pin: cleanPin },
+      });
+      if (authError) {
+        console.warn('Aviso Supabase Auth updateUser:', authError.message);
+      } else if (authData?.user) {
+        // Confirmação de gravação nos metadados da sessão
+      }
+    } catch (authErr) {
+      console.warn('Falha ao atualizar user_metadata no Supabase:', authErr);
+    }
+
+    // 2. Salva na tabela profiles do Supabase (se a coluna workspace_pin existir)
+    try {
+      const { error: profileError } = await supabase.from('profiles').upsert(
+        {
+          id: userId,
+          workspace_pin: cleanPin,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id' }
+      );
+      if (profileError) {
+        console.warn('Aviso: para persistir também na tabela profiles do Supabase, adicione a coluna: ALTER TABLE profiles ADD COLUMN IF NOT EXISTS workspace_pin text;', profileError.message);
+      }
+    } catch {
+      // Ignora erro caso a coluna ainda não tenha sido criada no Supabase
+    }
+  } catch (err) {
+    console.warn('Falha geral ao persistir workspace_pin no Supabase:', err);
+  }
+}
+
+/**
  * Cria ou atualiza uma empresa no Supabase
  */
 export async function createCompanyInSupabase(
@@ -335,28 +377,75 @@ export async function loadCompanyByCode(shareCode: string): Promise<Partial<Comp
 }
 
 /**
- * Carrega a empresa associada ao usuário (seja como Key User/fundador ou membro ativo)
+ * Carrega todas as empresas associadas ao usuário (como Key User/fundador ou membro de equipe)
  */
-export async function loadUserCompany(userId: string): Promise<CompanyWorkspace | null> {
-  if (!userId) return null;
+export async function loadUserCompanies(userId: string, userEmail?: string): Promise<CompanyWorkspace[]> {
+  if (!userId) return [];
+
+  const companiesMap = new Map<string, any>();
 
   try {
-    // 1. Verifica se o usuário é proprietário/Key User de alguma empresa
+    // 1. Busca todas as empresas onde o usuário é proprietário/fundador
     const { data: ownedCompanies, error: ownedError } = await supabase
       .from('companies')
       .select('*')
-      .eq('owner_id', userId)
-      .limit(1);
+      .eq('owner_id', userId);
 
-    if (!ownedError && ownedCompanies && ownedCompanies.length > 0) {
-      const comp = ownedCompanies[0];
-      // Carrega membros
-      const { data: membersData } = await supabase
+    if (!ownedError && ownedCompanies) {
+      ownedCompanies.forEach(comp => {
+        companiesMap.set(comp.id, { ...comp, isOwner: true });
+      });
+    }
+
+    // 2. Busca todas as empresas onde o usuário é membro de equipe (ativo)
+    let memberQuery = supabase
+      .from('company_members')
+      .select('company_id, is_key_user')
+      .eq('status', 'active');
+
+    if (userEmail) {
+      memberQuery = memberQuery.or(`user_id.eq.${userId},email.eq.${userEmail.trim().toLowerCase()}`);
+    } else {
+      memberQuery = memberQuery.eq('user_id', userId);
+    }
+
+    const { data: memberRows, error: memberError } = await memberQuery;
+
+    if (!memberError && memberRows && memberRows.length > 0) {
+      const missingCompIds = memberRows
+        .map(m => m.company_id)
+        .filter(id => id && !companiesMap.has(id));
+
+      if (missingCompIds.length > 0) {
+        const { data: compRows, error: compError } = await supabase
+          .from('companies')
+          .select('*')
+          .in('id', missingCompIds);
+
+        if (!compError && compRows) {
+          compRows.forEach(comp => {
+            const memInfo = memberRows.find(m => m.company_id === comp.id);
+            companiesMap.set(comp.id, {
+              ...comp,
+              isOwner: comp.owner_id === userId,
+              isMemberKeyUser: Boolean(memInfo?.is_key_user),
+            });
+          });
+        }
+      }
+    }
+
+    // 3. Constrói a lista completa de workspaces com membros e setores
+    const results: CompanyWorkspace[] = [];
+
+    for (const comp of companiesMap.values()) {
+      // Carrega membros da empresa
+      const { data: allMembersData } = await supabase
         .from('company_members')
         .select('*')
         .eq('company_id', comp.id);
 
-      const members: TeamMember[] = (membersData || []).map((m: any) => ({
+      const members: TeamMember[] = (allMembersData || []).map((m: any) => ({
         id: m.user_id || m.id,
         name: m.name,
         email: m.email,
@@ -366,10 +455,10 @@ export async function loadUserCompany(userId: string): Promise<CompanyWorkspace 
         status: m.status || 'active',
       }));
 
-      // Carrega solicitações pendentes
-      const pendingRequests = await loadCompanyJoinRequests(comp.id);
+      const isKeyUser = comp.isOwner || comp.owner_id === userId || Boolean(comp.isMemberKeyUser);
+      const pendingRequests = isKeyUser ? await loadCompanyJoinRequests(comp.id) : [];
 
-      return {
+      results.push({
         id: comp.id,
         shareCode: comp.share_code,
         name: comp.name,
@@ -386,81 +475,35 @@ export async function loadUserCompany(userId: string): Promise<CompanyWorkspace 
           {
             id: userId,
             name: comp.key_user_name || 'Key User',
-            email: comp.key_user_email,
+            email: comp.key_user_email || userEmail,
             role: 'Key User & Fundador(a)',
             department: 'quality',
             isKeyUser: true,
             status: 'active',
-          }
+          },
         ],
         ownerId: comp.owner_id,
         keyUserName: comp.key_user_name,
         keyUserEmail: comp.key_user_email,
-        isKeyUser: true,
+        isKeyUser,
         pendingRequests,
-      };
+      });
     }
 
-    // 2. Se não for proprietário, verifica se é membro ativo de alguma empresa
-    const { data: memberRows, error: memberError } = await supabase
-      .from('company_members')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'active')
-      .limit(1);
-
-    if (!memberError && memberRows && memberRows.length > 0) {
-      const memRow = memberRows[0];
-      const { data: compData, error: compError } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', memRow.company_id)
-        .single();
-
-      if (!compError && compData) {
-        // Carrega todos os membros da empresa
-        const { data: allMembersData } = await supabase
-          .from('company_members')
-          .select('*')
-          .eq('company_id', compData.id);
-
-        const members: TeamMember[] = (allMembersData || []).map((m: any) => ({
-          id: m.user_id || m.id,
-          name: m.name,
-          email: m.email,
-          role: m.role,
-          department: m.department,
-          isKeyUser: Boolean(m.is_key_user),
-          status: m.status || 'active',
-        }));
-
-        return {
-          id: compData.id,
-          shareCode: compData.share_code,
-          name: compData.name,
-          industry: compData.industry || 'Tecnologia & Inovação',
-          mission: compData.mission || 'Construir produtos ágeis e colaborativos.',
-          sectors: [
-            { id: 'tech', name: 'Tecnologia & Dev', tone: 'cyan' },
-            { id: 'marketing', name: 'Marketing & Growth', tone: 'pink' },
-            { id: 'qa', name: 'Testes & QA', tone: 'amber' },
-            { id: 'quality', name: 'Qualidade & Produto', tone: 'green' },
-            { id: 'ops', name: 'Operações & RH', tone: 'violet' },
-          ],
-          members,
-          ownerId: compData.owner_id,
-          keyUserName: compData.key_user_name,
-          keyUserEmail: compData.key_user_email,
-          isKeyUser: compData.owner_id === userId,
-          pendingRequests: [],
-        };
-      }
-    }
+    return results;
   } catch (err) {
-    console.warn('Aviso ao carregar empresa do usuário no Supabase:', err);
+    console.warn('Aviso ao carregar empresas do usuário no Supabase:', err);
+    return [];
   }
+}
 
-  return null;
+/**
+ * Carrega a empresa ativa ou primária associada ao usuário
+ */
+export async function loadUserCompany(userId: string, userEmail?: string): Promise<CompanyWorkspace | null> {
+  if (!userId) return null;
+  const companies = await loadUserCompanies(userId, userEmail);
+  return companies[0] ?? null;
 }
 
 /**

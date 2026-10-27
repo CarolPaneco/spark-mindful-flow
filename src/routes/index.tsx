@@ -70,9 +70,17 @@ function Index() {
   const company = data.companyWorkspace;
   const activeSectors = isBusinessMode && company ? company.sectors : data.sectors;
 
-  const workspaceIdeas = data.ideas.filter(i =>
-    isBusinessMode ? i.workspace === 'business' : i.workspace !== 'business'
-  );
+  const workspaceIdeas = data.ideas.filter(i => {
+    if (isBusinessMode) {
+      if (i.workspace !== 'business') return false;
+      // Isola ideias por empresa ativa para suportar múltiplas empresas por conta/email
+      if (company?.id && i.companyId && i.companyId !== company.id) {
+        return false;
+      }
+      return true;
+    }
+    return i.workspace !== 'business';
+  });
 
   const activeIdeas = workspaceIdeas.filter(i => !i.archived);
   const archivedCount = workspaceIdeas.filter(i => i.archived).length;

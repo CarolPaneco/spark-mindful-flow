@@ -126,34 +126,40 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
       const companyIdeas = await loadCompanyIdeasFromSupabase(cleanCode);
 
       // 4. Atualiza o estado local para entrar no workspace
+      const newJoinedComp = {
+        id: companyId,
+        shareCode: cleanCode,
+        name: resolvedName,
+        industry: remoteCompany?.industry || 'Tecnologia & Serviços',
+        mission: remoteCompany?.mission || 'Crescimento e excelência contínua.',
+        sectors: defaultCompanySectors,
+        members: [
+          {
+            id: user?.id || `user-${Date.now()}`,
+            name: userName.trim(),
+            role: role.trim(),
+            email: userEmail.trim(),
+            department,
+            isKeyUser: false,
+            status: 'pending' as const,
+          },
+        ],
+        keyUserName: remoteCompany?.keyUserName || 'Key User da Empresa',
+        isKeyUser: false,
+      };
+
       setData(prev => {
-        const curComp = prev.companyWorkspace;
+        const existingCompanies = prev.companies || (prev.companyWorkspace ? [prev.companyWorkspace] : []);
+        const updatedCompanies = [
+          newJoinedComp,
+          ...existingCompanies.filter(c => c.id !== newJoinedComp.id),
+        ];
         return {
           ...prev,
           workspaceMode: 'business',
-          companyWorkspace: {
-            ...curComp,
-            id: companyId,
-            shareCode: cleanCode,
-            name: resolvedName,
-            industry: remoteCompany?.industry || curComp?.industry || 'Tecnologia & Serviços',
-            mission: remoteCompany?.mission || curComp?.mission || 'Crescimento e excelência contínua.',
-            sectors: curComp?.sectors?.length ? curComp.sectors : defaultCompanySectors,
-            members: [
-              ...(curComp?.members || []),
-              {
-                id: user?.id || `user-${Date.now()}`,
-                name: userName.trim(),
-                role: role.trim(),
-                email: userEmail.trim(),
-                department,
-                isKeyUser: false,
-                status: 'pending',
-              },
-            ],
-            keyUserName: remoteCompany?.keyUserName || 'Key User da Empresa',
-            isKeyUser: false,
-          },
+          companies: updatedCompanies,
+          companyWorkspace: newJoinedComp,
+          activeCompanyId: newJoinedComp.id,
           ideas: [
             ...companyIdeas,
             ...prev.ideas.filter(i => !companyIdeas.some(ci => ci.id === i.id)),
@@ -202,11 +208,20 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
       }
 
       // Aplica no FlowProvider
-      setData(prev => ({
-        ...prev,
-        workspaceMode: 'business',
-        companyWorkspace: newWorkspace,
-      }));
+      setData(prev => {
+        const existingCompanies = prev.companies || (prev.companyWorkspace ? [prev.companyWorkspace] : []);
+        const updatedCompanies = [
+          newWorkspace,
+          ...existingCompanies.filter(c => c.id !== newWorkspace.id),
+        ];
+        return {
+          ...prev,
+          workspaceMode: 'business',
+          companies: updatedCompanies,
+          companyWorkspace: newWorkspace,
+          activeCompanyId: newWorkspace.id,
+        };
+      });
 
       toast.success(
         `Empresa "${newWorkspace.name}" fundada com sucesso! Seu código é ${newWorkspace.shareCode} 👑`,

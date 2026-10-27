@@ -29,19 +29,36 @@ import { Idea, createStarterBusinessIdeas, defaultCompanyWorkspace } from '@/lib
 import { User, LogIn, LogOut, Cloud, CloudCheck, RefreshCw, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const navigation = [
-  { to: '/', name: 'Funil', icon: Layers3 },
-  { to: '/hoje', name: 'Hoje', icon: CalendarDays },
-  { to: '/setores', name: 'Setores', icon: Grid2X2 },
-  { to: '/ajustes', name: 'Ajustes', icon: SlidersHorizontal },
-] as const;
-
 export function AppShell({ children }: { children: ReactNode }) {
-  const { data, setData, user, profile, isSyncing, syncWithCloud, requestSwitchWorkspace, signOut, pendingRequests } = useFlow();
+  const {
+    data,
+    setData,
+    user,
+    profile,
+    isSyncing,
+    syncWithCloud,
+    requestSwitchWorkspace,
+    signOut,
+    pendingRequests,
+    companies,
+    switchCompany,
+  } = useFlow();
   const [capture, setCapture] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
+
+  // Verificação de sessão desbloqueada ao iniciar:
+  // "ao iniciar quero ir direto pra tela de login, mesmo que ja tenha salvo um login"
+  const [sessionUnlocked, setSessionUnlocked] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return sessionStorage.getItem('ideaflow_session_unlocked') === 'true';
+  });
+
+  const [authOpen, setAuthOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('ideaflow_session_unlocked') !== 'true';
+  });
+
   const [profileIdeaId, setProfileIdeaId] = useState<string | null>(null);
   const [mentorIdea, setMentorIdea] = useState<Idea | null>(null);
   const [greeting, setGreeting] = useState('Que bom ter você aqui');
@@ -70,15 +87,37 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const handleAuthSuccess = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('ideaflow_session_unlocked', 'true');
+    }
+    setSessionUnlocked(true);
     setGuestMode(true);
     setAuthOpen(false);
   };
 
   const handleAuthClose = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('ideaflow_session_unlocked', 'true');
+    }
+    setSessionUnlocked(true);
     setGuestMode(true);
-    localStorage.setItem('ideaflow_guest_session', 'true');
     setAuthOpen(false);
   };
+
+  const isBusiness = data.workspaceMode === 'business';
+  const company = data.companyWorkspace;
+  const validCompanies = (companies && companies.length > 0)
+    ? companies.filter(c => c.id && c.id !== 'company-acme-corp' && c.shareCode !== 'ACME-2026')
+    : (data.companyWorkspace && data.companyWorkspace.id && data.companyWorkspace.id !== 'company-acme-corp' && data.companyWorkspace.shareCode !== 'ACME-2026')
+      ? [data.companyWorkspace]
+      : [];
+
+  const navigation = [
+    { to: '/', name: isBusiness ? 'Iniciativas' : 'Funil', icon: Layers3 },
+    { to: '/hoje', name: 'Hoje', icon: CalendarDays },
+    { to: '/setores', name: isBusiness ? 'Departamentos' : 'Setores', icon: isBusiness ? Building2 : Grid2X2 },
+    { to: '/ajustes', name: 'Ajustes', icon: SlidersHorizontal },
+  ] as const;
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -117,6 +156,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       window.removeEventListener('ideaflow:tutorial', tutorialEvent);
     };
   }, []);
+
+  // Garante que a primeira tela ao entrar no app seja sempre o login caso não tenha feito login
+  useEffect(() => {
+    if (!user && sessionStorage.getItem('ideaflow_session_unlocked') !== 'true') {
+      setAuthOpen(true);
+    }
+  }, [user]);
 
   const dedicated = data.ideas.reduce((sum, i) => sum + i.dedicated, 0);
   const isAuthorized = Boolean(user || guestMode);
@@ -188,7 +234,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           {/* Seletor Rápido de Workspace no Menu Lateral */}
           {!sidebarCollapsed ? (
-            <div className="p-1 rounded-xl bg-secondary/50 border border-border/80 flex items-center justify-between gap-1 text-xs">
+            <>
+              <div className="p-1 rounded-xl bg-secondary/50 border border-border/80 flex items-center justify-between gap-1 text-xs">
               <button
                 type="button"
                 onClick={() => requestSwitchWorkspace('personal')}
@@ -221,6 +268,28 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )}
               </button>
             </div>
+            {data.workspaceMode === 'business' && validCompanies.length > 1 && (
+              <div className="mt-2 px-1">
+                <select
+                  value={data.companyWorkspace?.id ?? ''}
+                  onChange={async e => {
+                    const targetId = e.target.value;
+                    if (targetId && targetId !== data.companyWorkspace?.id) {
+                      await switchCompany(targetId);
+                    }
+                  }}
+                  aria-label="Selecionar organização ativa"
+                  className="w-full bg-secondary/80 text-foreground border border-violet/40 rounded-lg text-[11px] font-semibold py-1.5 px-2 outline-none cursor-pointer hover:border-violet focus:ring-1 focus:ring-violet truncate"
+                >
+                  {validCompanies.map(c => (
+                    <option key={c.id} value={c.id}>
+                      🏢 {c.name} {c.isKeyUser ? '(Key User)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            </>
           ) : (
             <button
               type="button"
@@ -472,6 +541,27 @@ export function AppShell({ children }: { children: ReactNode }) {
                 )}
               </button>
             </div>
+
+            {/* Dropdown de Troca Rápida de Empresa quando houver mais de uma */}
+            {data.workspaceMode === 'business' && validCompanies.length > 1 && (
+              <select
+                value={data.companyWorkspace?.id ?? ''}
+                onChange={async e => {
+                  const targetId = e.target.value;
+                  if (targetId && targetId !== data.companyWorkspace?.id) {
+                    await switchCompany(targetId);
+                  }
+                }}
+                aria-label="Selecionar organização ativa"
+                className="bg-secondary/90 text-foreground border border-violet/40 rounded-full text-[11px] font-semibold py-1 px-2.5 outline-none cursor-pointer hover:border-violet focus:ring-1 focus:ring-violet shrink-0 max-w-[130px] sm:max-w-[160px] truncate"
+              >
+                {validCompanies.map(c => (
+                  <option key={c.id} value={c.id}>
+                    🏢 {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div className="header-right flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Botão de Destaque: Mentor IA */}
@@ -666,6 +756,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       />
       <OnboardingTutorial
         open={showTutorial}
+        isBusiness={isBusiness}
         onClose={() => {
           setShowTutorial(false);
           localStorage.setItem('ideaflow_tutorial_completed', 'true');

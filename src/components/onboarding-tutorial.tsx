@@ -28,7 +28,7 @@ interface TourStep {
   glowColor: string;
 }
 
-const tourSteps: TourStep[] = [
+const personalTourSteps: TourStep[] = [
   {
     target: 'funil',
     route: '/',
@@ -89,15 +89,84 @@ const tourSteps: TourStep[] = [
   },
 ];
 
+const companyTourSteps: TourStep[] = [
+  {
+    target: 'funil',
+    route: '/',
+    title: 'Funil Corporativo de Iniciativas',
+    badge: 'Passo 1 de 5 · Governança & Execução',
+    description:
+      'No workspace da empresa, cada card é uma iniciativa estratégica. O time move projetos pelas 5 etapas com transparência total: Faísca ➔ Estrutura ➔ Em Fluxo ➔ Validação & QA ➔ Realidade (entregue ao cliente/mercado).',
+    tip: '💡 Dica do Líder: Cada iniciativa possui setor corporativo, responsável designado e prioridade estratégica visíveis para todos.',
+    icon: Layers3,
+    color: 'text-cyan',
+    glowColor: 'from-cyan/25 to-cyan/5 border-cyan/40',
+  },
+  {
+    target: 'setores',
+    route: '/setores',
+    title: 'Departamentos & Setores da Empresa',
+    badge: 'Passo 2 de 5 · Alinhamento Organizacional',
+    description:
+      'Estruture a organização por áreas de atuação (Tecnologia & Dev, Qualidade & Produto, Marketing, Operações, QA). O funil e os projetos são filtrados por departamento para evitar sobrecarga.',
+    tip: '💡 Dica: Você pode criar novos departamentos ou usar modelos corporativos com iniciativas estruturadas.',
+    icon: Shapes,
+    color: 'text-violet',
+    glowColor: 'from-violet/25 to-violet/5 border-violet/40',
+  },
+  {
+    target: 'funil',
+    route: '/',
+    title: 'Equipe & Responsáveis pelas Entregas',
+    badge: 'Passo 3 de 5 · Colaboração em Nuvem',
+    description:
+      'Colaboradores ingressam na sua empresa usando o código corporativo exclusivo. Atribua responsáveis diretos para cada iniciativa manter clareza de quem entrega o quê.',
+    tip: '💡 Dica: Compartilhe o código da empresa com seus colaboradores no menu lateral ou portal da organização.',
+    icon: Target,
+    color: 'text-pink',
+    glowColor: 'from-pink/25 to-pink/5 border-pink/40',
+  },
+  {
+    target: 'funil',
+    route: '/',
+    title: 'Painel do Key User & Governança',
+    badge: 'Passo 4 de 5 · Gestão & Aprovações',
+    description:
+      'Como Key User e líder da organização, novas solicitações de colaboradores chegam para sua validação. Você modera o acesso, gerencia setores e acompanha métricas consolidadas.',
+    tip: '💡 Dica: O painel de aprovações fica no topo da barra lateral no modo Empresa.',
+    icon: Wand2,
+    color: 'text-amber',
+    glowColor: 'from-amber/25 to-amber/5 border-amber/40',
+  },
+  {
+    target: 'capture',
+    title: '5 Porquês Corporativos & Planejamento Ágil',
+    badge: 'Passo 5 de 5 · Inovação com ROI',
+    description:
+      'Ao capturar uma iniciativa, responda as 5 perguntas estratégicas (Impacto no Negócio, Dor do Cliente/Processo, Responsável, ROI e MVP). A IA calcula planos de ação executivos sem burocracia.',
+    tip: '💡 Dica: Use o botão de captura por voz ou texto para registrar ideias de novos produtos ou otimizações de processo em segundos.',
+    icon: Sparkles,
+    color: 'text-green',
+    glowColor: 'from-green/25 to-green/5 border-green/40',
+  },
+];
+
 interface OnboardingTutorialProps {
   open: boolean;
   onClose: () => void;
+  isBusiness?: boolean;
 }
 
-export function OnboardingTutorial({ open, onClose }: OnboardingTutorialProps) {
+export function OnboardingTutorial({ open, onClose, isBusiness = false }: OnboardingTutorialProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (open) setCurrentStep(0);
+  }, [open]);
+
+  const tourSteps = isBusiness ? companyTourSteps : personalTourSteps;
 
   const step = tourSteps[currentStep];
   const isLast = currentStep === tourSteps.length - 1;
@@ -137,7 +206,11 @@ export function OnboardingTutorial({ open, onClose }: OnboardingTutorialProps) {
   const handleNext = () => {
     if (isLast) {
       localStorage.setItem('ideaflow_tutorial_completed', 'true');
-      toast.success('Tour concluído! Bem-vindo(a) ao seu novo espaço de realização ✨');
+      if (isBusiness) {
+        toast.success('Tour Corporativo concluído! Sua empresa pronta para inovar e executar com foco 🏢🚀');
+      } else {
+        toast.success('Tour concluído! Bem-vindo(a) ao seu novo espaço de realização ✨');
+      }
       onClose();
     } else {
       setCurrentStep(s => s + 1);

@@ -348,10 +348,14 @@ function Settings() {
             <div>
               <div className="flex items-center gap-2 font-semibold text-foreground">
                 <Compass size={16} className="text-primary" />
-                Tutorial Guiado do Aplicativo
+                {data.workspaceMode === 'business'
+                  ? 'Tour Corporativo do Aplicativo'
+                  : 'Tutorial Guiado do Aplicativo'}
               </div>
               <p className="text-muted-foreground leading-relaxed mt-1">
-                Quer rever o passo a passo com as 4 funções principais do Ideaflow?
+                {data.workspaceMode === 'business'
+                  ? 'Rever o tour com os 5 passos corporativos (funil de iniciativas, departamentos, governança e 5 porquês).'
+                  : 'Quer rever o passo a passo com as funções principais do Ideaflow?'}
               </p>
             </div>
             <Button
@@ -359,12 +363,20 @@ function Settings() {
               size="sm"
               onClick={() => {
                 window.dispatchEvent(new Event('ideaflow:tutorial'));
-                toast.success('Tutorial do aplicativo aberto!');
+                toast.success(
+                  data.workspaceMode === 'business'
+                    ? 'Tour corporativo do aplicativo aberto!'
+                    : 'Tutorial do aplicativo aberto!'
+                );
               }}
               className="mt-2 h-9 text-xs font-semibold gap-1.5 self-start cursor-pointer hover:bg-primary/10 hover:border-primary/40 active:scale-95"
             >
               <Sparkles size={14} className="text-primary" />
-              <span>Ver Tutorial do App Novamente</span>
+              <span>
+                {data.workspaceMode === 'business'
+                  ? 'Ver Tour Corporativo Novamente'
+                  : 'Ver Tutorial do App Novamente'}
+              </span>
             </Button>
           </div>
         </div>

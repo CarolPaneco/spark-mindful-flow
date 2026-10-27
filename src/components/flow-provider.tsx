@@ -23,8 +23,10 @@ import {
   approveCompanyJoinRequest,
   rejectCompanyJoinRequest,
   loadUserCompany,
+  loadUserCompanies,
   loadCompanyByCode,
   createCompanyJoinRequest,
+  saveUserWorkspacePin,
   type AuthProfile,
 } from '@/lib/supabase';
 import type { User, Session } from '@supabase/supabase-js';
@@ -52,6 +54,9 @@ interface FlowStore {
   pendingRequests: CompanyJoinRequest[];
   approveRequest: (request: CompanyJoinRequest) => Promise<void>;
   rejectRequest: (requestId: string) => Promise<void>;
+  companies: CompanyWorkspace[];
+  activeCompany: CompanyWorkspace | undefined;
+  switchCompany: (companyId: string) => Promise<void>;
 }
 
 const FlowContext = createContext<FlowStore | null>(null);
@@ -63,13 +68,14 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Senha de 4 dígitos para proteger o Espaço Pessoal (Padrão: 1234)
+  // Senha/PIN para proteção da transição de Workspace (Pessoal <-> Empresa)
   const [personalPin, setPersonalPinState] = useState<string>(() => {
-    if (typeof window === 'undefined') return '1234';
-    return localStorage.getItem('ideaflow_personal_pin') || '1234';
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('ideaflow_personal_pin') || '';
   });
 
   const [pinModalOpen, setPinModalOpen] = useState(false);
+  const [targetWorkspace, setTargetWorkspace] = useState<'personal' | 'business'>('personal');
   const [companyAccessModalOpen, setCompanyAccessModalOpen] = useState(false);
   const [companyAccessInitialTab, setCompanyAccessInitialTab] = useState<'join' | 'create'>('join');
   const [onPinSuccessCallback, setOnPinSuccessCallback] = useState<(() => void) | null>(null);
@@ -110,13 +116,16 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       await approveCompanyJoinRequest(request.id, newMember, compId);
       setData(prev => {
         if (!prev.companyWorkspace) return prev;
+        const updatedCompany: CompanyWorkspace = {
+          ...prev.companyWorkspace,
+          members: [...(prev.companyWorkspace.members || []), newMember],
+          pendingRequests: (prev.companyWorkspace.pendingRequests || []).filter(r => r.id !== request.id),
+        };
+        const updatedCompanies = (prev.companies || []).map(c => c.id === updatedCompany.id ? updatedCompany : c);
         return {
           ...prev,
-          companyWorkspace: {
-            ...prev.companyWorkspace,
-            members: [...(prev.companyWorkspace.members || []), newMember],
-            pendingRequests: (prev.companyWorkspace.pendingRequests || []).filter(r => r.id !== request.id),
-          },
+          companies: updatedCompanies,
+          companyWorkspace: updatedCompany,
         };
       });
       setPendingRequests(prev => prev.filter(r => r.id !== request.id));
@@ -131,12 +140,15 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       await rejectCompanyJoinRequest(requestId);
       setData(prev => {
         if (!prev.companyWorkspace) return prev;
+        const updatedCompany: CompanyWorkspace = {
+          ...prev.companyWorkspace,
+          pendingRequests: (prev.companyWorkspace.pendingRequests || []).filter(r => r.id !== requestId),
+        };
+        const updatedCompanies = (prev.companies || []).map(c => c.id === updatedCompany.id ? updatedCompany : c);
         return {
           ...prev,
-          companyWorkspace: {
-            ...prev.companyWorkspace,
-            pendingRequests: (prev.companyWorkspace.pendingRequests || []).filter(r => r.id !== requestId),
-          },
+          companies: updatedCompanies,
+          companyWorkspace: updatedCompany,
         };
       });
       setPendingRequests(prev => prev.filter(r => r.id !== requestId));
@@ -147,17 +159,32 @@ export function FlowProvider({ children }: { children: ReactNode }) {
   };
 
   const setPersonalPin = (newPin: string) => {
-    setPersonalPinState(newPin);
+    const cleanPin = newPin ? newPin.trim() : '';
+    setPersonalPinState(cleanPin);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('ideaflow_personal_pin', newPin);
+      if (cleanPin) {
+        localStorage.setItem('ideaflow_personal_pin', cleanPin);
+        if (user?.email) {
+          localStorage.setItem(`ideaflow_pin_${user.email.toLowerCase()}`, cleanPin);
+        }
+      } else {
+        localStorage.removeItem('ideaflow_personal_pin');
+        if (user?.email) {
+          localStorage.removeItem(`ideaflow_pin_${user.email.toLowerCase()}`);
+        }
+      }
     }
     setData(prev => ({
       ...prev,
       profile: {
         ...(prev.profile ?? { name: 'Criador', role: 'Criador', streak: 1 }),
-        personalPin: newPin,
+        personalPin: cleanPin || undefined,
       },
     }));
+
+    if (user?.id) {
+      void saveUserWorkspacePin(user.id, cleanPin);
+    }
   };
 
   // 1. Inicializa dados locais (sempre limpo de ideias mockadas demo-*)
@@ -171,6 +198,16 @@ export function FlowProvider({ children }: { children: ReactNode }) {
             parsed.companyWorkspace?.id === 'company-acme-corp' ||
             parsed.companyWorkspace?.shareCode === 'ACME-2026';
           const validCompany = isMockCompany ? undefined : (parsed.companyWorkspace || undefined);
+          const rawCompanies = Array.isArray(parsed.companies) ? parsed.companies : [];
+          const validCompanies = rawCompanies.filter(
+            c => c && c.id && c.id !== 'company-acme-corp' && c.shareCode !== 'ACME-2026'
+          );
+          if (validCompany && !validCompanies.some(c => c.id === validCompany.id)) {
+            validCompanies.unshift(validCompany);
+          }
+          const activeId = parsed.activeCompanyId || validCompany?.id || validCompanies[0]?.id;
+          const activeCompany = validCompanies.find(c => c.id === activeId) || validCompanies[0] || validCompany;
+
           const cleanIdeas = (parsed.ideas || []).filter(
             i => !i.id.startsWith('demo-') && !i.id.startsWith('biz-') && i.companyId !== 'company-acme-corp'
           );
@@ -179,8 +216,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
             ...parsed,
             ideas: cleanIdeas,
             sectors: cleanSectors,
-            companyWorkspace: validCompany,
-            workspaceMode: validCompany ? (parsed.workspaceMode ?? 'personal') : 'personal',
+            companies: validCompanies,
+            companyWorkspace: activeCompany,
+            activeCompanyId: activeCompany?.id,
+            workspaceMode: activeCompany ? (parsed.workspaceMode ?? 'personal') : 'personal',
           });
 
           if (parsed.profile?.personalPin) {
@@ -242,6 +281,23 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       setIsSyncing(true);
       // Carrega perfil
       const userProfile = await loadUserProfile(currentUser.id);
+      const authPin = (currentUser.user_metadata as Record<string, any> | undefined)?.['workspace_pin'];
+      const profilePin = userProfile?.workspace_pin;
+      const emailBackupPin = currentUser.email
+        ? localStorage.getItem(`ideaflow_pin_${currentUser.email.toLowerCase()}`)
+        : null;
+
+      const remotePin = authPin || profilePin || emailBackupPin || '';
+      if (remotePin) {
+        setPersonalPinState(remotePin);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('ideaflow_personal_pin', remotePin);
+          if (currentUser.email) {
+            localStorage.setItem(`ideaflow_pin_${currentUser.email.toLowerCase()}`, remotePin);
+          }
+        }
+      }
+
       if (userProfile) {
         setProfile(userProfile);
         setData(prev => ({
@@ -251,26 +307,37 @@ export function FlowProvider({ children }: { children: ReactNode }) {
             role: userProfile.role || 'Criador(a)',
             bio: prev.profile?.bio,
             streak: prev.profile?.streak ?? 1,
-            personalPin: prev.profile?.personalPin,
+            personalPin: remotePin || prev.profile?.personalPin,
           },
         }));
       }
 
-      // Consulta se o usuário faz parte de uma empresa no Supabase (Key User ou membro)
-      const userCompany = await loadUserCompany(currentUser.id);
-      if (userCompany) {
-        setData(prev => ({
-          ...prev,
-          companyWorkspace: userCompany,
-        }));
-        if (userCompany.isKeyUser && userCompany.pendingRequests) {
-          setPendingRequests(userCompany.pendingRequests);
+      // Consulta se o usuário faz parte de empresas no Supabase (Key User em várias ou membro)
+      const userCompanies = await loadUserCompanies(currentUser.id, currentUser.email || undefined);
+      if (userCompanies.length > 0) {
+        let chosenActive: CompanyWorkspace | undefined;
+        setData(prev => {
+          const activeId = prev.activeCompanyId || prev.companyWorkspace?.id;
+          chosenActive = userCompanies.find(c => c.id === activeId) || userCompanies[0];
+          return {
+            ...prev,
+            companies: userCompanies,
+            companyWorkspace: chosenActive,
+            activeCompanyId: chosenActive?.id,
+          };
+        });
+        if (chosenActive?.isKeyUser && chosenActive.pendingRequests) {
+          setPendingRequests(chosenActive.pendingRequests);
+        } else {
+          setPendingRequests([]);
         }
       } else {
         // Usuário pessoal / sem vínculo corporativo
         setData(prev => ({
           ...prev,
+          companies: [],
           companyWorkspace: undefined,
+          activeCompanyId: undefined,
           workspaceMode: prev.workspaceMode === 'business' ? 'personal' : prev.workspaceMode,
         }));
         setPendingRequests([]);
@@ -279,9 +346,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       // Carrega ideias da nuvem (pessoais)
       const cloudIdeas = await loadUserIdeasFromSupabase(currentUser.id);
 
-      // Carrega ideias da empresa se houver workspace corporativo
-      const companyId = userCompany?.id || data.companyWorkspace?.id;
-      const companyCloudIdeas = companyId ? await loadCompanyIdeasFromSupabase(companyId) : [];
+      // Carrega ideias de todas as empresas do usuário
+      const companyIdeasPromises = userCompanies.map(c => c.id ? loadCompanyIdeasFromSupabase(c.id) : Promise.resolve([]));
+      const companyIdeasArrays = await Promise.all(companyIdeasPromises);
+      const companyCloudIdeas = companyIdeasArrays.flat();
 
       // Mescla com as ideias locais mantendo as mais recentes
       const allLoaded = [...cloudIdeas, ...companyCloudIdeas];
@@ -377,35 +445,26 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // Alternador de Workspace com verificação de PIN de 4 dígitos
+  // Alternador de Workspace com segurança e definição opcional de senha (Empresa <-> Pessoal)
   const requestSwitchWorkspace = (target: 'personal' | 'business') => {
-    // Se o usuário está no modo empresarial e deseja ir para o pessoal: EXIGE O PIN DE 4 DÍGITOS
-    if (target === 'personal' && data.workspaceMode === 'business') {
-      setOnPinSuccessCallback(() => () => {
-        setData(prev => ({ ...prev, workspaceMode: 'personal' }));
-        toast.success('Workspace Pessoal desbloqueado! 👤');
-      });
-      setPinModalOpen(true);
+    if (target === data.workspaceMode) return;
+
+    // Se estiver alternando para a empresa e ainda não tiver empresa vinculada/criada:
+    if (target === 'business' && (!data.companyWorkspace || !data.companyWorkspace.id)) {
+      setCompanyAccessModalOpen(true);
       return;
     }
 
-    // Se estiver alternando para a empresa:
-    if (target === 'business') {
-      // Se ainda não tiver empresa vinculada/criada, abre o portal para entrar com código ou criar
-      if (!data.companyWorkspace || !data.companyWorkspace.id) {
-        setCompanyAccessModalOpen(true);
-        return;
+    setTargetWorkspace(target);
+    setOnPinSuccessCallback(() => () => {
+      setData(prev => ({ ...prev, workspaceMode: target }));
+      if (target === 'personal') {
+        toast.success('Espaço Pessoal desbloqueado! 👤');
+      } else {
+        toast.success(`Workspace da Empresa (${data.companyWorkspace?.name ?? 'Empresa'}) ativado! 🏢`);
       }
-
-      setData(prev => ({
-        ...prev,
-        workspaceMode: 'business',
-      }));
-      toast.success(`Workspace da Empresa (${data.companyWorkspace.name}) ativado 🏢`);
-      return;
-    }
-
-    setData(prev => ({ ...prev, workspaceMode: target }));
+    });
+    setPinModalOpen(true);
   };
 
   // Entrar em uma empresa existente com Código Compartilhado com validação no Supabase
@@ -445,31 +504,40 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
       });
 
+      const newJoinedCompany: CompanyWorkspace = {
+        id: companyId,
+        shareCode: cleanCode,
+        name: resolvedName,
+        industry: remoteCompany?.industry || 'Tecnologia & Inovação',
+        mission: remoteCompany?.mission || 'Crescimento e foco em entregas.',
+        sectors: defaultCompanySectors,
+        members: [
+          {
+            id: user?.id || `user-${Date.now()}`,
+            name: applicantName,
+            role: 'Colaborador(a)',
+            email: applicantEmail,
+            department: 'tech',
+            isKeyUser: false,
+            status: 'pending',
+          },
+        ],
+        keyUserName: remoteCompany?.keyUserName || 'Key User',
+        isKeyUser: false,
+      };
+
       setData(prev => {
+        const existingCompanies = prev.companies || (prev.companyWorkspace ? [prev.companyWorkspace] : []);
+        const updatedCompanies = [
+          newJoinedCompany,
+          ...existingCompanies.filter(c => c.id !== newJoinedCompany.id),
+        ];
         return {
           ...prev,
           workspaceMode: 'business',
-          companyWorkspace: {
-            id: companyId,
-            shareCode: cleanCode,
-            name: resolvedName,
-            industry: remoteCompany?.industry || 'Tecnologia & Inovação',
-            mission: remoteCompany?.mission || 'Crescimento e foco em entregas.',
-            sectors: defaultCompanySectors,
-            members: [
-              {
-                id: user?.id || `user-${Date.now()}`,
-                name: applicantName,
-                role: 'Colaborador(a)',
-                email: applicantEmail,
-                department: 'tech',
-                isKeyUser: false,
-                status: 'pending',
-              },
-            ],
-            keyUserName: remoteCompany?.keyUserName || 'Key User',
-            isKeyUser: false,
-          },
+          companies: updatedCompanies,
+          companyWorkspace: newJoinedCompany,
+          activeCompanyId: newJoinedCompany.id,
           ideas: [
             ...companyIdeas,
             ...prev.ideas.filter(i => !companyIdeas.some(ci => ci.id === i.id)),
@@ -487,6 +555,50 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const switchCompany = async (companyId: string) => {
+    const allCompanies = data.companies || (data.companyWorkspace ? [data.companyWorkspace] : []);
+    const target = allCompanies.find(c => c.id === companyId);
+    if (!target) {
+      toast.error('Empresa não encontrada na sua lista.');
+      return;
+    }
+
+    setData(prev => ({
+      ...prev,
+      workspaceMode: 'business',
+      companyWorkspace: target,
+      activeCompanyId: target.id,
+    }));
+
+    if (target.isKeyUser && target.pendingRequests) {
+      setPendingRequests(target.pendingRequests);
+    } else {
+      setPendingRequests([]);
+    }
+
+    // Carrega ideias da nova empresa selecionada em tempo real
+    if (target.id) {
+      try {
+        const freshCompanyIdeas = await loadCompanyIdeasFromSupabase(target.id);
+        if (freshCompanyIdeas.length > 0) {
+          setData(prev => {
+            const map = new Map<string, Idea>();
+            prev.ideas.forEach(i => map.set(i.id, i));
+            freshCompanyIdeas.forEach(i => map.set(i.id, i));
+            return {
+              ...prev,
+              ideas: Array.from(map.values()),
+            };
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar ideias da empresa selecionada:', err);
+      }
+    }
+
+    toast.success(`Alternado para a empresa "${target.name}"! 🏢`);
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -502,9 +614,12 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         streak: 1,
       },
       workspaceMode: 'personal',
+      companies: [],
       companyWorkspace: undefined,
+      activeCompanyId: undefined,
     }));
     try {
+      sessionStorage.removeItem('ideaflow_session_unlocked');
       localStorage.removeItem('ideaflow-v1');
       localStorage.removeItem('ideaflow_guest_session');
       localStorage.removeItem('ideaflow_personal_pin');
@@ -516,6 +631,8 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       window.dispatchEvent(new CustomEvent('ideaflow:login'));
     }
   };
+
+  const userCompanies = data.companies || (data.companyWorkspace ? [data.companyWorkspace] : []);
 
   return (
     <FlowContext.Provider
@@ -542,11 +659,14 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         pendingRequests,
         approveRequest,
         rejectRequest,
+        companies: userCompanies,
+        activeCompany: data.companyWorkspace,
+        switchCompany,
       }}
     >
       {children}
 
-      {/* Modal Global de PIN de 4 dígitos para proteção do Espaço Pessoal */}
+      {/* Modal Global de Segurança e Senha de Transição (Empresa <-> Pessoal) */}
       <PersonalPinModal
         open={pinModalOpen}
         onClose={() => {
@@ -558,11 +678,12 @@ export function FlowProvider({ children }: { children: ReactNode }) {
             onPinSuccessCallback();
             setOnPinSuccessCallback(null);
           } else {
-            setData(prev => ({ ...prev, workspaceMode: 'personal' }));
+            setData(prev => ({ ...prev, workspaceMode: targetWorkspace }));
           }
         }}
         currentPin={personalPin}
         onUpdatePin={setPersonalPin}
+        targetWorkspace={targetWorkspace}
       />
 
       {/* Modal Global de Acesso Corporativo & Criação de Empresa (Key User) */}

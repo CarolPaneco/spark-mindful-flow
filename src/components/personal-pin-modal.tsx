@@ -1,5 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { Lock, Unlock, KeyRound, ShieldAlert, ArrowRight, Check, X, ShieldCheck } from 'lucide-react';
+import {
+  Lock,
+  Unlock,
+  KeyRound,
+  ShieldAlert,
+  ArrowRight,
+  Check,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Building2,
+  User,
+  Trash2,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,145 +28,127 @@ interface PersonalPinModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  currentPin: string;
+  currentPin?: string | undefined;
   onUpdatePin?: (newPin: string) => void;
+  targetWorkspace?: 'personal' | 'business';
 }
 
 export function PersonalPinModal({
   open,
   onClose,
   onSuccess,
-  currentPin = '1234',
+  currentPin = '',
   onUpdatePin,
+  targetWorkspace = 'personal',
 }: PersonalPinModalProps) {
-  const [digits, setDigits] = useState<string[]>(['', '', '', '']);
-  const [error, setError] = useState(false);
-  const [isChangingPin, setIsChangingPin] = useState(false);
-  const [newDigits, setNewDigits] = useState<string[]>(['', '', '', '']);
-  const [confirmDigits, setConfirmDigits] = useState<string[]>(['', '', '', '']);
-  const [changeStep, setChangeStep] = useState<'verify' | 'new' | 'confirm'>('verify');
+  const hasExistingPin = Boolean(currentPin && currentPin.trim().length > 0);
+
+  // Estados
+  const [view, setView] = useState<'unlock' | 'setup' | 'change'>(
+    hasExistingPin ? 'unlock' : 'setup'
+  );
+  const [enteredPin, setEnteredPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
 
-  const inputRefs = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-  ];
-
-  const newPinRefs = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-  ];
-
-  const confirmPinRefs = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-  ];
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
-      setDigits(['', '', '', '']);
-      setError(false);
-      setIsChangingPin(false);
+      setView(hasExistingPin ? 'unlock' : 'setup');
+      setEnteredPin('');
+      setNewPin('');
+      setConfirmPin('');
+      setError(null);
       setIsUnlocked(false);
-      setChangeStep('verify');
       setTimeout(() => {
-        inputRefs[0]?.current?.focus();
+        inputRef.current?.focus();
       }, 150);
     }
-  }, [open]);
+  }, [open, hasExistingPin]);
 
-  const handleDigitChange = (index: number, value: string) => {
-    // Apenas números
-    const cleanValue = value.replace(/\D/g, '').slice(-1);
+  const isGoingPersonal = targetWorkspace === 'personal';
 
-    const nextDigits = [...digits];
-    nextDigits[index] = cleanValue;
-    setDigits(nextDigits);
-    setError(false);
+  // Validação de desbloqueio com senha existente
+  const handleUnlock = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError(null);
 
-    if (cleanValue && index < 3) {
-      inputRefs[index + 1]?.current?.focus();
-    }
-
-    // Se preencheu os 4 dígitos, valida imediatamente
-    if (cleanValue && index === 3 && nextDigits.every(d => d !== '')) {
-      const enteredPin = nextDigits.join('');
-      validatePin(enteredPin);
-    }
-  };
-
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !digits[index] && index > 0) {
-      inputRefs[index - 1]?.current?.focus();
-    }
-  };
-
-  const handlePaste = (e: React.ClipboardEvent) => {
-    e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
-    if (!pasted) return;
-
-    const nextDigits = ['', '', '', ''];
-    for (let i = 0; i < pasted.length; i++) {
-      nextDigits[i] = pasted[i] || '';
-    }
-    setDigits(nextDigits);
-
-    if (pasted.length === 4) {
-      validatePin(pasted);
-    } else {
-      inputRefs[Math.min(pasted.length, 3)]?.current?.focus();
-    }
-  };
-
-  const validatePin = (enteredPin: string) => {
-    const expectedPin = currentPin || '1234';
-
-    if (enteredPin === expectedPin) {
-      setIsUnlocked(true);
-      setTimeout(() => {
-        toast.success('Espaço pessoal desbloqueado com sucesso! 🔓');
-        onSuccess();
-        onClose();
-      }, 400);
-    } else {
-      setError(true);
-      toast.error('Senha incorreta de 4 dígitos. Tente novamente.');
-      setTimeout(() => {
-        setDigits(['', '', '', '']);
-        inputRefs[0]?.current?.focus();
-      }, 400);
-    }
-  };
-
-  // Fluxo de alteração de PIN
-  const handleSaveNewPin = () => {
-    const p1 = newDigits.join('');
-    const p2 = confirmDigits.join('');
-
-    if (p1.length !== 4) {
-      toast.error('O novo PIN deve ter 4 dígitos numéricos.');
+    if (!enteredPin.trim()) {
+      setError('Digite sua senha de segurança.');
       return;
     }
 
-    if (p1 !== p2) {
-      toast.error('Os dois PINs digitados não conferem.');
+    if (enteredPin.trim() === currentPin.trim()) {
+      setIsUnlocked(true);
+      toast.success(
+        isGoingPersonal
+          ? 'Espaço Pessoal desbloqueado com sucesso! 🔓'
+          : 'Workspace da Empresa desbloqueado com sucesso! 🏢'
+      );
+      setTimeout(() => {
+        onSuccess();
+        onClose();
+      }, 350);
+    } else {
+      setError('Senha incorreta. Tente novamente.');
+      toast.error('Senha incorreta de segurança.');
+    }
+  };
+
+  // Salvar nova senha (na configuração inicial ou alteração)
+  const handleSavePin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const cleanNew = newPin.trim();
+    const cleanConfirm = confirmPin.trim();
+
+    if (!cleanNew) {
+      setError('Informe a nova senha de segurança.');
+      return;
+    }
+
+    if (cleanNew.length < 4) {
+      setError('A senha de segurança deve ter pelo menos 4 caracteres.');
+      return;
+    }
+
+    if (cleanNew !== cleanConfirm) {
+      setError('A confirmação da senha não coincide com a senha digitada.');
       return;
     }
 
     if (onUpdatePin) {
-      onUpdatePin(p1);
+      onUpdatePin(cleanNew);
     }
-    localStorage.setItem('ideaflow_personal_pin', p1);
-    toast.success('Nova senha pessoal de 4 dígitos cadastrada com sucesso! 🔒');
-    setIsChangingPin(false);
-    setDigits(['', '', '', '']);
+
+    toast.success('Senha de segurança de transição salva com sucesso! 🔒');
+    setIsUnlocked(true);
+    setTimeout(() => {
+      onSuccess();
+      onClose();
+    }, 350);
+  };
+
+  // Continuar sem senha (opção livre caso não queira proteger)
+  const handleContinueWithoutPin = () => {
+    toast.info('Transição concluída sem senha de bloqueio. ✨');
+    onSuccess();
+    onClose();
+  };
+
+  // Remover senha de segurança
+  const handleRemovePin = () => {
+    if (onUpdatePin) {
+      onUpdatePin('');
+    }
+    toast.success('Senha de segurança removida. Agora os espaços alternam livremente.');
+    setView('setup');
+    setEnteredPin('');
   };
 
   return (
@@ -162,95 +158,103 @@ export function PersonalPinModal({
           <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-violet/20 border border-primary/30 flex items-center justify-center text-primary shadow-xs">
             {isUnlocked ? (
               <Unlock size={24} className="text-green animate-bounce" />
+            ) : view === 'setup' ? (
+              <ShieldCheck size={24} className="text-violet animate-pulse" />
             ) : (
               <Lock size={22} className="text-primary animate-pulse" />
             )}
           </div>
 
           <DialogTitle className="text-xl font-display font-bold text-foreground">
-            {isChangingPin ? 'Alterar Senha Pessoal' : 'Área Pessoal Protegida'}
+            {view === 'setup'
+              ? 'Proteção de Transição de Espaço'
+              : view === 'change'
+              ? 'Alterar Senha de Segurança'
+              : 'Espaço Protegido por Senha'}
           </DialogTitle>
 
           <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-            {isChangingPin
-              ? 'Defina um novo código de 4 dígitos para proteger seu espaço individual.'
-              : 'Você está no Workspace da Empresa. Digite sua senha pessoal de 4 dígitos para acessar suas ideias e projetos particulares.'}
+            {view === 'setup'
+              ? isGoingPersonal
+                ? 'Você está alternando para o seu Espaço Pessoal. Se quiser privacidade contra acessos de terceiros, defina uma senha de segurança agora (opcional).'
+                : 'Você está alternando para o Workspace da Empresa. Se quiser, defina uma senha de segurança agora (opcional).'
+              : view === 'change'
+              ? 'Digite a nova senha e confirme para atualizar sua proteção de transição.'
+              : isGoingPersonal
+              ? 'Você está no Workspace da Empresa. Digite sua senha de segurança para acessar seu Espaço Pessoal.'
+              : 'Digite sua senha de segurança para acessar o Workspace Corporativo.'}
           </DialogDescription>
         </DialogHeader>
 
-        {!isChangingPin ? (
-          <div className="space-y-6 pt-3">
-            {/* 4 Caixas de Dígitos do PIN */}
-            <div
-              className={`flex items-center justify-center gap-3 ${
-                error ? 'animate-shake' : ''
-              }`}
-              onPaste={handlePaste}
-            >
-              {[0, 1, 2, 3].map(index => (
+        {/* 1. MODO DESBLOQUEIO COM SENHA ATUAL */}
+        {view === 'unlock' && (
+          <form onSubmit={handleUnlock} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                <span>Senha de Segurança:</span>
+                <span className="text-[11px] text-muted-foreground font-normal">
+                  Transição {isGoingPersonal ? 'Empresa ➔ Pessoal' : 'Pessoal ➔ Empresa'}
+                </span>
+              </label>
+              <div className="relative">
                 <input
-                  key={index}
-                  ref={inputRefs[index]}
-                  type="password"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={1}
-                  value={digits[index]}
-                  onChange={e => handleDigitChange(index, e.target.value)}
-                  onKeyDown={e => handleKeyDown(index, e)}
-                  disabled={isUnlocked}
-                  className={`w-13 h-14 text-center text-2xl font-bold font-mono rounded-xl border transition-all outline-none ${
-                    error
-                      ? 'border-destructive bg-destructive/10 text-destructive ring-2 ring-destructive/30'
-                      : isUnlocked
-                      ? 'border-green bg-green/10 text-green ring-2 ring-green/30'
-                      : digits[index]
-                      ? 'border-primary bg-primary/10 text-foreground ring-2 ring-primary/20'
-                      : 'border-border/80 bg-secondary/50 text-foreground focus:border-primary focus:ring-2 focus:ring-primary/25'
-                  }`}
-                  aria-label={`Dígito ${index + 1}`}
+                  ref={inputRef}
+                  type={showPassword ? 'text' : 'password'}
+                  className="w-full h-11 px-3.5 pr-10 rounded-xl border border-border/80 bg-secondary/50 text-foreground font-mono text-center tracking-widest text-lg focus:border-primary focus:ring-2 focus:ring-primary/25 outline-none transition-all"
+                  placeholder="••••"
+                  value={enteredPin}
+                  onChange={e => {
+                    setEnteredPin(e.target.value);
+                    setError(null);
+                  }}
+                  autoFocus
                 />
-              ))}
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
 
             {error && (
               <p className="text-center text-xs text-destructive font-medium flex items-center justify-center gap-1.5 animate-in fade-in-50">
                 <ShieldAlert size={14} />
-                <span>Senha incorreta de 4 dígitos. Tente novamente.</span>
+                <span>{error}</span>
               </p>
             )}
 
-            {/* Rodapé explicativo e senha padrão */}
-            <div className="p-3 rounded-xl bg-secondary/40 border border-border/70 text-xs text-muted-foreground space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-medium text-foreground">
-                  <ShieldCheck size={14} className="text-primary" />
-                  Privacidade no ambiente de trabalho
-                </span>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-secondary text-primary font-bold">
-                  Padrão: 1234
-                </span>
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/70">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-[11px] text-muted-foreground hover:text-primary gap-1 px-1 cursor-pointer"
+                  onClick={() => {
+                    setView('change');
+                    setNewPin('');
+                    setConfirmPin('');
+                    setError(null);
+                  }}
+                >
+                  <KeyRound size={12} />
+                  <span>Alterar Senha</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-[11px] text-destructive/80 hover:text-destructive gap-1 px-1 cursor-pointer"
+                  onClick={handleRemovePin}
+                  title="Remover proteção com senha"
+                >
+                  <Trash2 size={12} />
+                  <span>Remover</span>
+                </Button>
               </div>
-              <p className="text-[11px] leading-relaxed">
-                Essa camada de segurança garante que colegas de trabalho não tenham acesso acidental ao seu funil particular.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 pt-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground hover:text-primary gap-1 cursor-pointer"
-                onClick={() => {
-                  setIsChangingPin(true);
-                  setNewDigits(['', '', '', '']);
-                  setConfirmDigits(['', '', '', '']);
-                }}
-              >
-                <KeyRound size={13} />
-                <span>Alterar meu PIN</span>
-              </Button>
 
               <div className="flex items-center gap-2">
                 <Button
@@ -263,98 +267,193 @@ export function PersonalPinModal({
                   Cancelar
                 </Button>
                 <Button
-                  type="button"
+                  type="submit"
                   size="sm"
-                  className="h-8 text-xs font-semibold px-4 cursor-pointer"
-                  onClick={() => validatePin(digits.join(''))}
-                  disabled={digits.some(d => d === '') || isUnlocked}
+                  className="h-8 text-xs font-semibold px-4 cursor-pointer gap-1"
+                  disabled={!enteredPin.trim() || isUnlocked}
                 >
-                  <span>Entrar</span>
-                  <ArrowRight size={13} className="ml-1" />
+                  <span>Desbloquear</span>
+                  <ArrowRight size={13} />
                 </Button>
               </div>
             </div>
-          </div>
-        ) : (
-          /* MODO: ALTERAR SENHA DE 4 DÍGITOS */
+          </form>
+        )}
+
+        {/* 2. MODO DEFINIR SENHA (SETUP INICIAL - SE O USUÁRIO QUISER) */}
+        {view === 'setup' && (
           <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-foreground block">
-                Novo PIN (4 dígitos):
-              </label>
-              <div className="flex items-center gap-2 justify-center">
-                {[0, 1, 2, 3].map(index => (
+            <form onSubmit={handleSavePin} className="space-y-3.5">
+              <div className="p-3 rounded-xl bg-violet/10 border border-violet/25 text-xs text-foreground space-y-1">
+                <p className="font-semibold text-violet flex items-center gap-1.5">
+                  <Sparkles size={14} />
+                  Defina uma senha se desejar proteção
+                </p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Caso divida este computador ou navegador com colegas de equipe, você pode definir uma senha e verificação de senha para alternar entre os espaços.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">
+                  Nova Senha de Segurança:
+                </label>
+                <div className="relative">
                   <input
-                    key={index}
-                    ref={newPinRefs[index]}
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={newDigits[index]}
+                    ref={inputRef}
+                    type={showPassword ? 'text' : 'password'}
+                    className="w-full h-10 px-3 pr-10 rounded-lg border border-border/80 bg-secondary/50 text-foreground text-sm focus:border-primary outline-none"
+                    placeholder="Mínimo 4 caracteres (números ou letras)"
+                    value={newPin}
                     onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '').slice(-1);
-                      const next = [...newDigits];
-                      next[index] = val;
-                      setNewDigits(next);
-                      if (val && index < 3) newPinRefs[index + 1]?.current?.focus();
+                      setNewPin(e.target.value);
+                      setError(null);
                     }}
-                    className="w-11 h-12 text-center text-xl font-bold font-mono rounded-lg border border-border bg-secondary/50 focus:border-primary outline-none"
                   />
-                ))}
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground block">
+                  Verificação da Senha (Confirme):
+                </label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="w-full h-10 px-3 rounded-lg border border-border/80 bg-secondary/50 text-foreground text-sm focus:border-primary outline-none"
+                  placeholder="Digite a mesma senha novamente"
+                  value={confirmPin}
+                  onChange={e => {
+                    setConfirmPin(e.target.value);
+                    setError(null);
+                  }}
+                />
+              </div>
+
+              {error && (
+                <p className="text-center text-xs text-destructive font-medium flex items-center justify-center gap-1.5 animate-in fade-in-50">
+                  <ShieldAlert size={14} />
+                  <span>{error}</span>
+                </p>
+              )}
+
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-border/70">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full sm:w-auto h-8 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={handleContinueWithoutPin}
+                >
+                  Continuar sem Senha
+                </Button>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs cursor-pointer"
+                    onClick={onClose}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-8 text-xs font-semibold px-4 cursor-pointer gap-1 bg-violet hover:bg-violet/90 text-white"
+                    disabled={!newPin.trim() || !confirmPin.trim()}
+                  >
+                    <Check size={13} />
+                    <span>Salvar Senha & Alternar</span>
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* 3. MODO ALTERAR SENHA */}
+        {view === 'change' && (
+          <form onSubmit={handleSavePin} className="space-y-3.5 pt-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground block">
+                Nova Senha de Segurança:
+              </label>
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  type={showPassword ? 'text' : 'password'}
+                  className="w-full h-10 px-3 pr-10 rounded-lg border border-border/80 bg-secondary/50 text-foreground text-sm focus:border-primary outline-none"
+                  placeholder="Mínimo 4 caracteres"
+                  value={newPin}
+                  onChange={e => {
+                    setNewPin(e.target.value);
+                    setError(null);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground block">
-                Confirme o Novo PIN:
+                Verificação da Senha (Confirme):
               </label>
-              <div className="flex items-center gap-2 justify-center">
-                {[0, 1, 2, 3].map(index => (
-                  <input
-                    key={index}
-                    ref={confirmPinRefs[index]}
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={confirmDigits[index]}
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '').slice(-1);
-                      const next = [...confirmDigits];
-                      next[index] = val;
-                      setConfirmDigits(next);
-                      if (val && index < 3) confirmPinRefs[index + 1]?.current?.focus();
-                    }}
-                    className="w-11 h-12 text-center text-xl font-bold font-mono rounded-lg border border-border bg-secondary/50 focus:border-primary outline-none"
-                  />
-                ))}
-              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="w-full h-10 px-3 rounded-lg border border-border/80 bg-secondary/50 text-foreground text-sm focus:border-primary outline-none"
+                placeholder="Repita a nova senha"
+                value={confirmPin}
+                onChange={e => {
+                  setConfirmPin(e.target.value);
+                  setError(null);
+                }}
+              />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border/70">
+            {error && (
+              <p className="text-center text-xs text-destructive font-medium flex items-center justify-center gap-1.5 animate-in fade-in-50">
+                <ShieldAlert size={14} />
+                <span>{error}</span>
+              </p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/70">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="text-xs cursor-pointer"
-                onClick={() => setIsChangingPin(false)}
+                className="h-8 text-xs cursor-pointer"
+                onClick={() => setView('unlock')}
               >
                 Voltar
               </Button>
               <Button
-                type="button"
+                type="submit"
                 size="sm"
-                className="text-xs font-semibold px-4 gap-1.5 cursor-pointer"
-                onClick={handleSaveNewPin}
-                disabled={newDigits.some(d => d === '') || confirmDigits.some(d => d === '')}
+                className="h-8 text-xs font-semibold px-4 cursor-pointer gap-1"
+                disabled={!newPin.trim() || !confirmPin.trim()}
               >
                 <Check size={13} />
-                <span>Salvar Novo PIN</span>
+                <span>Salvar Nova Senha</span>
               </Button>
             </div>
-          </div>
+          </form>
         )}
       </DialogContent>
     </Dialog>
   );
 }
-
