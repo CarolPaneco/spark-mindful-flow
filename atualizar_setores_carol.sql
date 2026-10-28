@@ -89,5 +89,14 @@ SET sector = 'insta', workspace = 'personal', company_id = NULL
 WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4'
   AND (title ILIKE '%reels%' OR title ILIKE '%erros que todo júnior%');
 
+-- 4. Limpeza estrita: garante que NENHUMA ideia pessoal tenha resíduo de departamento, equipe ou company_id
+UPDATE public.ideas
+SET department = NULL,
+    assigned_to = NULL,
+    company_id = NULL
+WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4'
+  AND workspace = 'personal';
+
 -- Confirmação rápida
-SELECT id, title, sector, workspace, company_id FROM public.ideas WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4';
+SELECT id, title, sector, workspace, department, assigned_to, company_id FROM public.ideas WHERE user_id = 'c0efe1ff-1bf6-443a-9b1b-a3dba995d8d4';
+
