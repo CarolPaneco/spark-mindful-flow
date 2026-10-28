@@ -113,7 +113,20 @@
   --primary: #E11D48;
   --panel-glow: radial-gradient(ellipse 80% 50% at 50% -5%, rgba(225, 29, 72, 0.12), transparent 65%), #F8FAFC;
 }
-.app-root { min-height: 100dvh; background: var(--panel-glow); padding-bottom: 110px; }
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+}
+.app-root {
+  min-height: 100dvh;
+  background: var(--panel-glow);
+  padding-bottom: 96px;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+  position: relative;
+}
 .topbar {
   height: 64px;
   border-bottom: 1px solid var(--border);
@@ -123,16 +136,20 @@
   top: 0;
   z-index: 40;
   width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
 }
 .topbar-inner {
   width: 100%;
   max-width: 100%;
   height: 100%;
   margin: 0;
-  padding: 0 20px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  box-sizing: border-box;
 }
 .wordmark { display: flex; align-items: center; font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--foreground); letter-spacing: -0.02em; }
 .wordmark > span:not(.brand-icon):not(.brand-dot) { font-weight: 400; color: var(--muted-foreground); }
@@ -340,11 +357,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media(min-width:1500px) { .card-title h3 { font-size: 16px; } .idea-card { padding: 18px 18px 0; } }
 @media(max-width:1100px) and (min-width:701px) { .topbar-inner { padding: 0 30px; } .main-content { padding: 30px 30px 0; } .kanban { gap: 12px; overflow-x: auto; grid-template-columns: repeat(5,minmax(205px,1fr)); padding-bottom: 12px; } .spark-note { display: none !important; } .sectors-grid { grid-template-columns: repeat(2,1fr); } .palette-grid { grid-template-columns: repeat(3,1fr); } }
 @media(max-width:700px) {
-  .topbar { height: 58px; }
-  .topbar-inner { padding: 0 16px; }
-  .wordmark { font-size: 19px; }
-  .brand-icon { width: 30px; height: 30px; margin-right: 6px; }
-  .brand-icon svg { width: 17px; height: 17px; }
+  .topbar { height: 56px; max-width: 100vw; overflow: hidden; }
+  .topbar-inner { padding: 0 12px; gap: 6px; }
+  .wordmark { font-size: 18px; }
+  .brand-icon { width: 28px; height: 28px; margin-right: 4px; }
+  .brand-icon svg { width: 16px; height: 16px; }
   .header-right { gap: 6px; }
   .header-streak { display: none !important; }
   .header-divider { display: none !important; }
@@ -386,9 +403,35 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .add-stage { height: 44px; font-size: 12px; font-weight: 500; border-radius: 10px; }
   .flow-inspiration { margin-top: 20px; font-size: 11px; }
   .desktop-bottom-note { display: none; }
-  .bottom-nav { width: calc(100% - 24px); max-width: 420px; bottom: max(16px,env(safe-area-inset-bottom)); padding: 6px 8px; height: 66px; border-radius: 24px; grid-template-columns: 1fr 1fr 70px 1fr 1fr; }
-  .nav-item { font-size: 11px; font-weight: 600; height: 50px; }
-  .nav-item svg { width: 20px; height: 20px; }
+  .bottom-nav {
+    width: calc(100% - 20px);
+    max-width: 390px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    padding: 4px 6px;
+    height: 60px;
+    border-radius: 20px;
+    grid-template-columns: 1fr 1fr 58px 1fr 1fr;
+    box-sizing: border-box;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+  .nav-item {
+    font-size: 10px;
+    font-weight: 600;
+    height: 48px;
+    padding: 2px 0;
+    gap: 2px;
+  }
+  .nav-item svg { width: 18px; height: 18px; }
+  .capture-fab {
+    height: 52px;
+    width: 52px;
+    top: -14px;
+    border-radius: 18px;
+    border-width: 3px;
+  }
+  .capture-fab svg { width: 22px; height: 22px; }
   .sheet-body { padding: 16px 14px 28px; }
   .sheet-title { font-size: 19px; line-height: 1.3; }
   .draft-title { font-size: 16px; padding: 10px 12px; }

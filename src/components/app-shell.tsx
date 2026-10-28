@@ -489,12 +489,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
 
             {/* Logo visível no Mobile */}
-            <Link to="/" className="wordmark md:hidden active:scale-95 transition-transform" aria-label="Ideaflow início">
+            <Link to="/" className="wordmark shrink-0 md:hidden active:scale-95 transition-transform" aria-label="Ideaflow início">
               <span className="brand-icon">
                 <AudioLines />
               </span>
-              idea<span>flow</span>
-              <span className="brand-dot">.</span>
+              <span className="hidden xs:inline">idea<span>flow</span><span className="brand-dot">.</span></span>
             </Link>
 
             {/* Breadcrumb / Status discreto no Desktop */}
@@ -504,16 +503,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
 
             {/* Alternador Global de Espaço: Pessoal vs Empresarial */}
-            <div className="inline-flex items-center p-0.5 rounded-full bg-secondary/80 border border-border/80 text-xs shadow-xs">
+            <div className="inline-flex items-center p-0.5 rounded-full bg-secondary/80 border border-border/80 text-xs shadow-xs shrink-0">
               <button
                 type="button"
                 onClick={() => requestSwitchWorkspace('personal')}
-                className={`px-2.5 py-1 rounded-full font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs ${
+                className={`px-2 py-1 sm:px-2.5 rounded-full font-semibold transition-all flex items-center gap-1 cursor-pointer text-xs ${
                   (data.workspaceMode ?? 'personal') === 'personal'
                     ? 'bg-background text-foreground shadow-xs font-bold'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
-                title="Alternar para Espaço Pessoal (exige PIN de 4 dígitos)"
+                title="Espaço Pessoal"
               >
                 <User size={12} className={(data.workspaceMode ?? 'personal') === 'personal' ? 'text-primary' : ''} />
                 <span className="hidden sm:inline">Pessoal</span>
@@ -522,20 +521,19 @@ export function AppShell({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => requestSwitchWorkspace('business')}
-                className={`px-2.5 py-1 rounded-full font-semibold transition-all flex items-center gap-1.5 cursor-pointer text-xs relative ${
+                className={`px-2 py-1 sm:px-2.5 rounded-full font-semibold transition-all flex items-center gap-1 cursor-pointer text-xs relative ${
                   data.workspaceMode === 'business'
                     ? 'bg-violet-600 text-white shadow-xs font-bold'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
-                title="Alternar para Espaço da Empresa"
+                title="Espaço da Empresa"
               >
                 <Building2 size={12} />
-                <span className="truncate max-w-[120px] hidden sm:inline">
+                <span className="hidden sm:inline truncate max-w-[100px]">
                   {data.companyWorkspace?.name ? data.companyWorkspace.name.split(' ')[0] : 'Empresa'}
                 </span>
-                <span className="sm:hidden">Empresa</span>
                 {data.companyWorkspace?.isKeyUser && pendingRequests.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-bold animate-pulse" title={`${pendingRequests.length} solicitações de adesão`}>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-400 text-slate-950 font-bold" title={`${pendingRequests.length} solicitações`}>
                     {pendingRequests.length}
                   </span>
                 )}
@@ -553,7 +551,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   }
                 }}
                 aria-label="Selecionar organização ativa"
-                className="bg-secondary/90 text-foreground border border-violet/40 rounded-full text-[11px] font-semibold py-1 px-2.5 outline-none cursor-pointer hover:border-violet focus:ring-1 focus:ring-violet shrink-0 max-w-[130px] sm:max-w-[160px] truncate"
+                className="bg-secondary/90 text-foreground border border-violet/40 rounded-full text-[10px] sm:text-[11px] font-semibold py-1 px-2 outline-none cursor-pointer hover:border-violet focus:ring-1 focus:ring-violet shrink-0 max-w-[95px] sm:max-w-[150px] truncate"
               >
                 {validCompanies.map(c => (
                   <option key={c.id} value={c.id}>
@@ -563,37 +561,28 @@ export function AppShell({ children }: { children: ReactNode }) {
               </select>
             )}
           </div>
-          <div className="header-right flex items-center gap-1 sm:gap-2.5 shrink-0">
-            {/* Botão de Destaque: Mentor IA (compacto no mobile para não espremer o perfil) */}
+          <div className="header-right flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* Botão de Destaque: Mentor IA */}
             <Button
               variant="outline"
               size="sm"
               data-tour="mentor"
-              className="h-8 sm:h-9 text-xs sm:text-sm gap-1 sm:gap-1.5 border-primary/50 bg-gradient-to-r from-primary/20 via-primary/10 to-violet/20 text-primary hover:bg-primary/25 active:scale-95 transition-all shadow-xs hover:shadow-primary/25 px-2 sm:px-3.5 rounded-full font-semibold shrink-0 cursor-pointer relative overflow-hidden group"
+              className="h-8 w-8 sm:w-auto sm:h-9 text-xs sm:text-sm p-0 sm:px-3.5 gap-1.5 border-primary/50 bg-gradient-to-r from-primary/20 via-primary/10 to-violet/20 text-primary hover:bg-primary/25 active:scale-95 transition-all shadow-xs rounded-full font-semibold shrink-0 cursor-pointer relative overflow-hidden group"
               onClick={() => {
                 setMentorIdea(null);
                 setAiChatOpen(true);
               }}
               title="Abrir Mentor IA"
             >
-              <span className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-              <Sparkles size={14} className="text-primary animate-pulse" />
+              <Sparkles size={14} className="text-primary animate-pulse shrink-0" />
               <span className="hidden sm:inline">Mentor IA</span>
             </Button>
 
-            {/* Streak de horas dedicadas (desktop) */}
-            <span className="header-streak hidden md:flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Flame size={15} className="text-amber" />
-              <strong className="text-foreground font-medium">
-                {(dedicated / 60).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}h
-              </strong>
-            </span>
-
-            {/* Alternador de Tema */}
+            {/* Alternador de Tema: escondido no mobile (disponível no menu de perfil) */}
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
+              className="hidden md:flex h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
               aria-label={data.theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
               title="Trocar tema"
               onClick={() => setData(p => ({ ...p, theme: p.theme === 'dark' ? 'light' : 'dark' }))}
@@ -606,70 +595,58 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 sm:h-9 text-xs sm:text-sm gap-1 border-primary/40 bg-card hover:bg-primary/10 text-foreground active:scale-95 transition-all px-2 sm:px-3 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
+                className="h-8 text-xs gap-1 border-primary/40 bg-card hover:bg-primary/10 text-foreground active:scale-95 transition-all px-2.5 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
                 onClick={() => setAuthOpen(true)}
-                title="Entrar ou criar conta gratuita para sincronizar ideias"
+                title="Entrar"
               >
                 <LogIn size={13} className="text-primary" />
-                <span className="text-[11px] sm:text-xs">Entrar</span>
+                <span>Entrar</span>
               </Button>
             ) : (
-              /* Indicador de Sincronização na Nuvem (se logado) */
+              /* Indicador de Sincronização na Nuvem: exibido em desktop */
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 sm:h-9 px-1.5 sm:px-2 rounded-full text-xs gap-1 text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
+                className="hidden md:flex h-8 sm:h-9 px-1.5 sm:px-2 rounded-full text-xs gap-1 text-muted-foreground hover:text-foreground active:scale-95 shrink-0 cursor-pointer"
                 onClick={() => syncWithCloud()}
                 disabled={isSyncing}
                 title="Sincronizar ideias com Supabase"
               >
                 <RefreshCw size={12} className={isSyncing ? 'animate-spin text-primary' : 'text-green'} />
-                <span className="text-[11px] font-mono hidden md:inline">{user.email?.split('@')[0]}</span>
+                <span className="text-[11px] font-mono">{user.email?.split('@')[0]}</span>
               </Button>
             )}
 
-            {/* Avatar / Trigger do Perfil: SEMPRE visível em mobile e desktop */}
-            {user ? (
-              <button
-                type="button"
-                onClick={() => setProfileOpen(true)}
-                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none shrink-0"
-                title="Abrir Meu Perfil e Empresas"
-                aria-label="Perfil do Usuário"
-              >
-                <div className="w-[32px] h-[32px] sm:w-[34px] sm:h-[34px] rounded-full bg-gradient-to-br from-primary via-primary/85 to-violet-600 text-white font-bold flex items-center justify-center text-xs sm:text-sm shadow-xs ring-2 ring-primary/40 hover:ring-primary/80 transition-all select-none">
-                  {userInitial}
-                </div>
-                <span className="absolute bottom-0 right-0 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-green border-2 border-background shadow-xs shadow-green animate-pulse" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setProfileOpen(true)}
-                className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none shrink-0"
-                title="Abrir Perfil"
-                aria-label="Perfil do Usuário"
-              >
-                <div className="w-[32px] h-[32px] sm:w-[34px] sm:h-[34px] rounded-full bg-gradient-to-br from-primary/70 to-secondary text-foreground font-bold flex items-center justify-center text-xs sm:text-sm border border-border/80 hover:ring-2 hover:ring-primary/60 transition-all select-none">
-                  {userInitial}
-                </div>
-              </button>
-            )}
+            {/* Avatar / Trigger do Perfil: SEMPRE visível em mobile e desktop com destaque limpo */}
+            <button
+              type="button"
+              onClick={() => setProfileOpen(true)}
+              className="avatar-trigger relative rounded-full cursor-pointer transition-transform active:scale-95 focus:outline-none shrink-0"
+              title="Abrir Meu Perfil e Empresas"
+              aria-label="Perfil do Usuário"
+            >
+              <div className="w-[32px] h-[32px] sm:w-[34px] sm:h-[34px] rounded-full bg-gradient-to-br from-primary via-primary/85 to-violet-600 text-white font-bold flex items-center justify-center text-xs sm:text-sm shadow-xs ring-2 ring-primary/40 hover:ring-primary/80 transition-all select-none">
+                {userInitial}
+              </div>
+              {user && (
+                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-green border-2 border-background shadow-xs shadow-green" />
+              )}
+            </button>
 
-            {/* Botão Explícito de Sair (se logado) */}
+            {/* Botão Explícito de Sair (apenas desktop, no mobile está no menu de perfil) */}
             {user && (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 sm:h-9 text-xs gap-1 border-destructive/35 text-destructive hover:bg-destructive/10 active:scale-95 transition-all px-2 sm:px-3 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
+                className="hidden md:flex h-8 sm:h-9 text-xs gap-1 border-destructive/35 text-destructive hover:bg-destructive/10 active:scale-95 transition-all px-2.5 sm:px-3 rounded-full font-semibold shadow-xs shrink-0 cursor-pointer"
                 onClick={async () => {
                   await signOut();
                   setAuthOpen(true);
                 }}
-                title="Sair da conta e ver tela de entrada"
+                title="Sair da conta"
               >
                 <LogOut size={13} />
-                <span className="hidden sm:inline">Sair</span>
+                <span>Sair</span>
               </Button>
             )}
           </div>
@@ -712,22 +689,21 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav className="bottom-nav md:hidden" aria-label="Navegação principal">
           {navigation.map((item, i) => {
             const tourId = item.to === '/' ? 'funil' : item.to === '/hoje' ? 'hoje' : item.to === '/setores' ? 'setores' : 'ajustes';
+            const shortName = item.to === '/' ? (isBusiness ? 'Empresa' : 'Funil') : item.to === '/setores' ? 'Setores' : item.name;
             return (
               <div key={item.to} className={`nav-slot slot-${i}`} data-tour={tourId}>
-                <Button
-                  asChild
-                  variant="ghost"
+                <Link
+                  to={item.to}
                   className={`nav-item ${path === item.to ? 'active' : ''}`}
                 >
-                  <Link to={item.to}>
-                    <item.icon />
-                    <span>{item.name}</span>
-                  </Link>
-                </Button>
+                  <item.icon />
+                  <span>{shortName}</span>
+                </Link>
               </div>
             );
           })}
-          <Button
+          <button
+            type="button"
             className="capture-fab"
             aria-label="Capturar ideia"
             title="Capturar ideia"
@@ -735,7 +711,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setCapture(true)}
           >
             <Mic />
-          </Button>
+          </button>
         </nav>
       )}
 
