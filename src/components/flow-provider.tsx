@@ -5,6 +5,7 @@ import {
   defaultCompanyWorkspace,
   defaultCompanySectors,
   createStarterBusinessIdeas,
+  initialSectors,
   type FlowData,
   type Idea,
   type CompanyWorkspace,
