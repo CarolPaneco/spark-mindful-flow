@@ -459,8 +459,19 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     setData(prev => {
       // Garante imutabilidade estrita do workspace da ideia (pessoal é pessoal, empresa é empresa)
       const existing = prev.ideas.find(i => i.id === id);
-      const safeWorkspace = existing?.workspace || 'personal';
-      const safePatch = { ...patch, workspace: safeWorkspace };
+      if (!existing) return prev;
+
+      const isPersonal = existing.workspace !== 'business';
+      const safeWorkspace = isPersonal ? 'personal' : 'business';
+
+      const safePatch: Partial<Idea> = {
+        ...patch,
+        workspace: safeWorkspace,
+        // Ideias pessoais NUNCA possuem companyId, departamento corporativo ou responsável de equipe
+        companyId: isPersonal ? undefined : (existing.companyId || patch.companyId),
+        department: isPersonal ? undefined : patch.department,
+        assignedTo: isPersonal ? undefined : patch.assignedTo,
+      };
 
       const updatedIdeas = prev.ideas.map(i => (i.id === id ? { ...i, ...safePatch } : i));
       if (user) {

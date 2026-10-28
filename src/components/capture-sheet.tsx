@@ -665,7 +665,12 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                 >
                   <option value="">Nenhum (Ideia independente / avulsa)</option>
                   {data.ideas
-                    .filter(i => !i.archived && (i.isProject || data.ideas.some(sub => sub.parentId === i.id)))
+                    .filter(
+                      i =>
+                        !i.archived &&
+                        (i.isProject || data.ideas.some(sub => sub.parentId === i.id)) &&
+                        (isBusiness ? i.workspace === 'business' : i.workspace !== 'business')
+                    )
                     .map(p => (
                       <option key={p.id} value={p.id}>
                         📁 {p.title}

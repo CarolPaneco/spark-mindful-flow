@@ -349,6 +349,10 @@ export function IdeaDetail({
       clarity: 'Módulo de projeto estruturado com foco em entrega incremental.',
       pivots: [],
       notes: [],
+      workspace: idea.workspace,
+      companyId: idea.workspace === 'business' ? (idea.companyId || data.companyWorkspace?.id) : undefined,
+      department: idea.workspace === 'business' ? idea.department : undefined,
+      assignedTo: idea.workspace === 'business' ? idea.assignedTo : undefined,
     };
 
     setData(prev => ({
@@ -401,6 +405,10 @@ export function IdeaDetail({
         clarity: 'Módulo inteligente desenhado para decompor a complexidade da ideia.',
         pivots: [],
         notes: [],
+        workspace: idea.workspace,
+        companyId: idea.workspace === 'business' ? (idea.companyId || data.companyWorkspace?.id) : undefined,
+        department: idea.workspace === 'business' ? idea.department : undefined,
+        assignedTo: idea.workspace === 'business' ? idea.assignedTo : undefined,
       }));
 
       setData(prev => ({
@@ -449,6 +457,10 @@ export function IdeaDetail({
         clarity: 'Módulo inteligente desenhado para decompor a complexidade da ideia.',
         pivots: [],
         notes: [],
+        workspace: idea.workspace,
+        companyId: idea.workspace === 'business' ? (idea.companyId || data.companyWorkspace?.id) : undefined,
+        department: idea.workspace === 'business' ? idea.department : undefined,
+        assignedTo: idea.workspace === 'business' ? idea.assignedTo : undefined,
       }));
 
       setData(prev => ({
@@ -595,7 +607,7 @@ export function IdeaDetail({
               ).name}
             </span>
 
-            {idea.assignedTo && (
+            {idea.workspace === 'business' && idea.assignedTo && (
               <span className="text-[11px] bg-primary/15 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full flex items-center gap-1 font-medium">
                 <Users size={11} />
                 Responsável: {idea.assignedTo}
@@ -813,7 +825,7 @@ export function IdeaDetail({
                         const secObj = applicableSectors.find(s => s.id === newSecId);
                         updateIdea(idea.id, {
                           sector: newSecId,
-                          department: secObj ? secObj.name : undefined,
+                          department: idea.workspace === 'business' ? (secObj ? secObj.name : undefined) : undefined,
                         });
                         toast.success(`Setor atualizado para "${secObj?.name || newSecId}"!`);
                       }}
@@ -1019,9 +1031,25 @@ export function IdeaDetail({
               {/* Informações de Configuração da Ideia */}
               <div className="detail-fields">
                 <label>
-                  Setor
-                  <select value={idea.sector} onChange={e => updateIdea(idea.id, { sector: e.target.value })}>
-                    {(data.sectors?.length ? data.sectors : initialSectors).map(s => (
+                  {idea.workspace === 'business' ? 'Departamento / Setor da Empresa' : 'Setor Pessoal'}
+                  <select
+                    value={idea.sector}
+                    onChange={e => {
+                      const newSecId = e.target.value;
+                      const applicableSectors = idea.workspace === 'business'
+                        ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
+                        : (data.sectors?.length ? data.sectors : initialSectors);
+                      const secObj = applicableSectors.find(s => s.id === newSecId);
+                      updateIdea(idea.id, {
+                        sector: newSecId,
+                        department: idea.workspace === 'business' ? (secObj ? secObj.name : undefined) : undefined,
+                      });
+                    }}
+                  >
+                    {(idea.workspace === 'business'
+                      ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
+                      : (data.sectors?.length ? data.sectors : initialSectors)
+                    ).map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name}
                       </option>

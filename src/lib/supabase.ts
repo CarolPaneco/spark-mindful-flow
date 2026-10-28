@@ -89,10 +89,11 @@ export function rowToIdea(row: any): Idea {
     isProject: Boolean(row.is_project || extraMeta.isProject),
     archived: Boolean(row.archived || extraMeta.archived),
     archivedAt: row.archived_at || extraMeta.archivedAt || undefined,
-    workspace: row.workspace || extraMeta.workspace || (row.company_id ? 'business' : 'personal'),
-    companyId: row.company_id || extraMeta.companyId || undefined,
-    assignedTo: row.assigned_to || extraMeta.assignedTo || undefined,
-    department: row.department || extraMeta.department || undefined,
+    // Isolamento estrito de Workspace: se não tem company_id e não é explicitamente business, é estritamente pessoal
+    workspace: (row.workspace === 'business' && Boolean(row.company_id || extraMeta.companyId)) ? 'business' : 'personal',
+    companyId: (row.workspace === 'business' && (row.company_id || extraMeta.companyId)) ? (row.company_id || extraMeta.companyId) : undefined,
+    assignedTo: (row.workspace === 'business') ? (row.assigned_to || extraMeta.assignedTo || undefined) : undefined,
+    department: (row.workspace === 'business') ? (row.department || extraMeta.department || undefined) : undefined,
     fiveWhys: Array.isArray(row.five_whys)
       ? row.five_whys
       : Array.isArray(extraMeta.fiveWhys)

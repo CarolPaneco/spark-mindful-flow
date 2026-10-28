@@ -29,7 +29,7 @@ export function IdeaCard({ idea, onOpen, onFocus }: Props) {
             <Circle size={7} fill="currentColor" />
             {sector.name}
           </span>
-          {idea.assignedTo && (
+          {idea.workspace === 'business' && idea.assignedTo && (
             <span
               className="text-[10px] bg-primary/15 text-primary border border-primary/30 px-2 py-0.5 rounded-full flex items-center gap-1 font-medium"
               title={`Responsável: ${idea.assignedTo}`}
