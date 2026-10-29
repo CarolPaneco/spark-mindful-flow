@@ -280,7 +280,7 @@ export async function loadUserProfile(userId: string): Promise<AuthProfile | nul
 /**
  * Salva perfil do usuário
  */
-export async function upsertUserProfile(profile: AuthProfile): Promise<void> {
+export async function upsertUserProfile(profile: Partial<AuthProfile> & { id: string }): Promise<void> {
   await supabase.from('profiles').upsert(profile, { onConflict: 'id' });
 }
 

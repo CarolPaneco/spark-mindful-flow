@@ -19,6 +19,7 @@ import {
   syncIdeasToSupabase,
   subscribeToCompanyIdeas,
   loadUserProfile,
+  upsertUserProfile,
   deleteIdeaFromSupabase,
   loadCompanyJoinRequests,
   approveCompanyJoinRequest,
@@ -328,7 +329,8 @@ export function FlowProvider({ children }: { children: ReactNode }) {
 
       // Se o perfil remoto não tinha setores gravados, persiste imediatamente no Supabase
       if (!userProfile?.sectors || !Array.isArray(userProfile.sectors) || userProfile.sectors.length === 0) {
-        void upsertUserProfile(currentUser.id, {
+        void upsertUserProfile({
+          id: currentUser.id,
           sectors: resolvedSectors,
         });
       }

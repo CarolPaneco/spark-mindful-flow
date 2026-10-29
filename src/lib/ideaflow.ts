@@ -207,7 +207,7 @@ export function resolveSector(
   }
 
   // 4. Fallback seguro: retorna o primeiro setor da lista disponível
-  return fallbackList[0];
+  return fallbackList[0] ?? initialSectors[0]!;
 }
 
 export const defaultCompanySectors: Sector[] = [

@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  User,
 } from 'lucide-react';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { toast } from 'sonner';
