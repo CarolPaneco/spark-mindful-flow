@@ -243,7 +243,61 @@ export function IdeaDetail({
     });
   };
 
-  const handleSuggestStepsAi = () => {
+  const [isSuggestingSteps, setIsSuggestingSteps] = useState(false);
+
+  const handleSuggestStepsAi = async () => {
+    setIsSuggestingSteps(true);
+    try {
+      const { callGroqChat, extractCleanJson, getActiveGroqKey } = await import('@/lib/groq');
+      if (getActiveGroqKey()) {
+        const prompt = `Você é o Ideaflow AI. Analise a seguinte ideia e seus passos:
+Título: "${idea.title}"
+Resumo: "${idea.summary}"
+Setor: "${idea.sector}"
+Passos atuais:
+${idea.steps.map((s, idx) => `${idx + 1}. [${s.done ? 'FEITO' : 'PENDENTE'}] ${s.text}`).join('\n')}
+
+Sugira de 1 a 2 NOVOS passos altamente práticos, específicos e complementares para avançar na execução desta ideia.
+PROIBIDO clichês genéricos como "pesquisar na internet" ou "planejar". Se for culinária, mencione ingredientes/utensílios; se for app/código, telas/integrações; se for negócios, vendas/clientes; se for rotina/treino, exercícios/agenda.
+Responda EXCLUSIVAMENTE um array JSON de objetos:
+[
+  { "text": "Ação prática e concreta", "minutes": 25 }
+]`;
+        const res = await callGroqChat({
+          messages: [{ role: 'user', content: prompt }],
+          json: true,
+          temperature: 0.6,
+          maxTokens: 500,
+        });
+
+        const parsed = extractCleanJson(res);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingTexts = new Set(idea.steps.map(s => s.text.toLowerCase()));
+          const newSteps: Step[] = parsed
+            .map((p: any) => ({
+              id: crypto.randomUUID(),
+              text: String(p.text || '').trim(),
+              minutes: Number(p.minutes) || 20,
+              done: false,
+            }))
+            .filter(s => s.text.length > 5 && !existingTexts.has(s.text.toLowerCase()));
+
+          if (newSteps.length > 0) {
+            const updated = [...idea.steps, ...newSteps.slice(0, 2)];
+            const totalMinutes = updated.reduce((sum, s) => sum + s.minutes, 0);
+            updateIdea(idea.id, { steps: updated, minutes: totalMinutes });
+            toast.success(`A IA adicionou ${newSteps.slice(0, 2).length} passos sob medida ao seu plano ✨`);
+            setIsSuggestingSteps(false);
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao sugerir passos via Groq:', err);
+    } finally {
+      setIsSuggestingSteps(false);
+    }
+
     const aiSteps = generateAiSteps(idea.title, idea.summary, idea.sector, 'estruturado');
     const existingTexts = new Set(idea.steps.map(s => s.text.toLowerCase()));
     const newFiltered = aiSteps.filter(s => !existingTexts.has(s.text.toLowerCase()));
@@ -1177,9 +1231,15 @@ export function IdeaDetail({
                     Marque os passos à medida que executa ou adicione novos passos.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={handleSuggestStepsAi}>
-                  <Sparkles size={13} className="text-primary" />
-                  Sugerir passos com IA
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={handleSuggestStepsAi}
+                  disabled={isSuggestingSteps}
+                >
+                  <Sparkles size={13} className={`text-primary ${isSuggestingSteps ? 'animate-spin' : ''}`} />
+                  {isSuggestingSteps ? 'Analisando...' : 'Sugerir passos com IA'}
                 </Button>
               </div>
 

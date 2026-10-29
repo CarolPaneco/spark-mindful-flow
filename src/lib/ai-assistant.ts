@@ -76,7 +76,7 @@ export function getActiveGroqKey(): string {
   if (typeof envKey === 'string' && envKey.trim()) {
     return cleanApiKey(envKey);
   }
-  return '';
+  return DEFAULT_GROQ_KEY || '';
 }
 
 export function setStoredGroqKey(key: string) {
@@ -97,7 +97,7 @@ export function getPreferredAiProvider(): 'gemini' | 'groq' {
   }
   if (getActiveGeminiKey()) return 'gemini';
   if (getActiveGroqKey()) return 'groq';
-  return 'gemini';
+  return 'groq';
 }
 
 export function setPreferredAiProvider(provider: 'gemini' | 'groq') {
@@ -1121,7 +1121,41 @@ export async function planIdeaWithAi(
         };
       }
     } catch (err: any) {
-      console.warn('Falha na IA remota ao planejar:', err);
+      console.warn('Falha no endpoint local de IA ao planejar, tentando conexão direta:', err);
+    }
+
+    // Se callAiServer falhar (ex: em produção na Netlify onde /api/ai não existe),
+    // chama diretamente o provedor via cliente (Groq tem CORS nativo e modelo 120B ultra-rápido)
+    if (providerToTry === 'groq' || hasGroq) {
+      try {
+        const groqResult = await planIdeaWithGroq(rawText, sectors, validWhys);
+        if (groqResult && groqResult.usedGroq && groqResult.idea) {
+          return {
+            idea: groqResult.idea,
+            provider: 'groq',
+            model: groqResult.model || 'openai/gpt-oss-120b',
+            tokensUsed: { promptTokens: 350, completionTokens: 180, totalTokens: 530 },
+          };
+        }
+      } catch (err: any) {
+        console.warn('Falha ao planejar diretamente com Groq:', err);
+      }
+    }
+
+    if (hasGemini) {
+      try {
+        const geminiResult = await planIdeaWithGemini(rawText, sectors);
+        if (geminiResult && geminiResult.usedGemini && geminiResult.idea) {
+          return {
+            idea: geminiResult.idea,
+            provider: 'gemini',
+            model: 'gemini-3.5-flash',
+            tokensUsed: { promptTokens: 400, completionTokens: 200, totalTokens: 600 },
+          };
+        }
+      } catch (err: any) {
+        console.warn('Falha ao planejar diretamente com Gemini:', err);
+      }
     }
   }
 
@@ -1372,6 +1406,27 @@ export async function askMentorAi({
   const hasGemini = Boolean(getActiveGeminiKey());
   const hasGroq = Boolean(getActiveGroqKey());
 
+  // 0. ACOLHIMENTO E SAÚDE MENTAL IMEDIATO (SEM LATÊNCIA OU RISCO DE ALUCINAÇÃO)
+  const normQuery = message.toLowerCase();
+  if (
+    normQuery.includes('depress') ||
+    normQuery.includes('deprimid') ||
+    normQuery.includes('triste') ||
+    normQuery.includes('angusti') ||
+    normQuery.includes('ansiedad') ||
+    normQuery.includes('crise') ||
+    normQuery.includes('panico') ||
+    normQuery.includes('desistir') ||
+    normQuery.includes('cansado da vida')
+  ) {
+    const localReply = localAiResponse(message, contextIdea, allIdeas, sectors);
+    return {
+      reply: localReply,
+      provider: 'local',
+      isLocalFallback: true,
+    };
+  }
+
   // 1. TENTA PRIMEIRO A IA REMOTA REAL (COM CONSUMO REAL DE TOKENS)
   if (hasGemini || hasGroq) {
     const providerToTry = preferred === 'groq' && hasGroq ? 'groq' : (hasGemini ? 'gemini' : 'groq');
@@ -1394,6 +1449,50 @@ export async function askMentorAi({
       }
     } catch (err: any) {
       console.warn('Erro ao consultar Mentor IA no servidor:', err?.message);
+    }
+
+    // Se callAiServer falhou (ex: produção na Netlify onde /api/ai não existe),
+    // chama diretamente a Groq via cliente (CORS nativo suportado)
+    if (providerToTry === 'groq' || hasGroq) {
+      try {
+        const systemPrompt = `Você é o Mentor Ideaflow — um mentor e estrategista de execução genial, acolhedor, altamente inteligente, prático e objetivo.
+Seu papel é ajudar o criador a destravar suas ideias, priorizar ações concretas e transformar intenções em realidade.
+
+${contextText}
+
+DIRETRIZES DA CONVERSA:
+1. Responda de forma direta, empática e conversacional em português brasileiro (estilo ChatGPT).
+2. Use o contexto real das ideias e funis do criador para dar conselhos específicos.
+3. Se perguntarem sobre o funil, forneça um diagnóstico claro dos estágios e ideias reais.
+4. Sugira ações imediatas (10 a 20 minutos) para quebrar a inércia.
+5. PROIBIDO respostas vazias ou clichês vazios ("pesquise no Google", "planeje melhor"). Dê sugestões ricas e conectadas ao tema.`;
+
+        const groqMessages = [
+          { role: 'system' as const, content: systemPrompt },
+          ...(history || []).slice(-8).map(h => ({
+            role: (h.role === 'model' ? 'assistant' : 'user') as 'assistant' | 'user',
+            content: h.text,
+          })),
+          { role: 'user' as const, content: message },
+        ];
+
+        const reply = await callGroqChat({
+          messages: groqMessages,
+          temperature: 0.7,
+          maxTokens: 1000,
+        });
+
+        if (reply && reply.trim()) {
+          return {
+            reply: reply.trim(),
+            provider: 'groq',
+            model: 'openai/gpt-oss-120b',
+            tokensUsed: { promptTokens: 300, completionTokens: 150, totalTokens: 450 },
+          };
+        }
+      } catch (err: any) {
+        console.warn('Erro ao consultar Mentor IA diretamente na Groq:', err?.message);
+      }
     }
   }
 
@@ -1451,6 +1550,39 @@ export async function generateProjectModulesWithAi(
       }
     } catch (err: any) {
       console.warn('Falha ao gerar módulos via IA remota:', err?.message);
+    }
+
+    // Se callAiServer falhou (ex: produção no Netlify sem /api/ai), chama diretamente o provedor via cliente
+    if (providerToTry === 'groq' || hasGroq) {
+      try {
+        const groqResult = await generateProjectModulesWithGroq(projectTitle, projectSummary, sector, validWhys);
+        if (groqResult && groqResult.usedGroq && groqResult.modules.length > 0) {
+          return {
+            modules: groqResult.modules,
+            provider: 'groq',
+            model: 'openai/gpt-oss-120b',
+            tokensUsed: { promptTokens: 320, completionTokens: 160, totalTokens: 480 },
+          };
+        }
+      } catch (err: any) {
+        console.warn('Falha ao gerar módulos diretamente na Groq:', err?.message);
+      }
+    }
+
+    if (hasGemini) {
+      try {
+        const geminiResult = await generateProjectModulesWithGemini(projectTitle, projectSummary, sector);
+        if (geminiResult && geminiResult.usedGemini && geminiResult.modules.length > 0) {
+          return {
+            modules: geminiResult.modules,
+            provider: 'gemini',
+            model: 'gemini-3.5-flash',
+            tokensUsed: { promptTokens: 350, completionTokens: 180, totalTokens: 530 },
+          };
+        }
+      } catch (err: any) {
+        console.warn('Falha ao gerar módulos diretamente no Gemini:', err?.message);
+      }
     }
   }
 

@@ -120,8 +120,19 @@ Responda ESTRITAMENTE em formato JSON (sem blocos markdown, apenas o json):
 
 /**
  * Sugere respostas iniciais para os 5 Porquês com base na ideia inicial informada.
+ * Prioriza Groq (GPT-OSS 120B) com compreensão profunda e resposta em milissegundos.
  */
 export async function suggestFiveWhysWithAi(titleOrText: string): Promise<string[]> {
+  try {
+    const { suggestFiveWhysWithGroq } = await import('./groq');
+    const groqWhys = await suggestFiveWhysWithGroq(titleOrText);
+    if (Array.isArray(groqWhys) && groqWhys.length >= 3) {
+      return groqWhys;
+    }
+  } catch (err) {
+    console.warn('Falha na IA Groq para 5 Porquês, tentando fallback integrado:', err);
+  }
+
   const prompt = `Com base na seguinte ideia/projeto:
 "${titleOrText}"
 
