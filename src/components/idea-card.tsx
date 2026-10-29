@@ -12,8 +12,8 @@ interface Props {
 export function IdeaCard({ idea, onOpen, onFocus }: Props) {
   const { data } = useFlow();
   const availableSectors = (data.workspaceMode === 'business' && data.companyWorkspace)
-    ? (data.companyWorkspace.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
-    : (data.sectors?.length ? data.sectors : initialSectors);
+    ? (data.companyWorkspace.sectors || [])
+    : (data.sectors || []);
   const sector = resolveSector(idea.sector, availableSectors, idea.title, idea.summary);
   const completed = idea.steps.filter(s => s.done).length;
   const percent = idea.steps.length ? Math.round((completed / idea.steps.length) * 100) : 0;

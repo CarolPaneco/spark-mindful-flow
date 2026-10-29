@@ -159,55 +159,37 @@ export function inferSectorFromContent(title?: string, summary?: string): string
   return 'tech';
 }
 
+export const NO_SECTOR: Sector = {
+  id: 'none',
+  name: 'Sem setor',
+  tone: 'cyan',
+};
+
 /**
- * Resolve o setor de forma resiliente para nunca deixar uma ideia 'Sem setor'
+ * Resolve o setor sem generalizar nem inventar dados:
+ * Retorna o setor correspondente da lista do usuário ou 'Sem setor' (NO_SECTOR).
  */
 export function resolveSector(
   sectorId: string | undefined,
-  availableSectors: Sector[],
-  title?: string,
-  summary?: string
+  availableSectors: Sector[] = [],
+  _title?: string,
+  _summary?: string
 ): Sector {
-  const fallbackList = availableSectors && availableSectors.length > 0 ? availableSectors : initialSectors;
+  if (!sectorId || sectorId === 'none' || sectorId === 'undefined' || !availableSectors || availableSectors.length === 0) {
+    return NO_SECTOR;
+  }
 
   // 1. Tenta correspondência exata por ID
-  if (sectorId) {
-    const directMatch = fallbackList.find(s => s.id === sectorId);
-    if (directMatch) return directMatch;
-  }
+  const directMatch = availableSectors.find(s => s.id === sectorId);
+  if (directMatch) return directMatch;
 
-  // 2. Mapeamento de equivalências e sinônimos conhecidos
-  const lowerSec = (sectorId || '').toLowerCase().trim();
-  if (lowerSec === 'dev' || lowerSec === 'code' || lowerSec === 'tecnologia') {
-    const match = fallbackList.find(s => s.id === 'tech');
-    if (match) return match;
-  }
-  if (lowerSec === 'instagram' || lowerSec === 'social' || lowerSec === 'conteudo') {
-    const match = fallbackList.find(s => s.id === 'insta');
-    if (match) return match;
-  }
-  if (lowerSec === 'dieta' || lowerSec === 'academia' || lowerSec === 'saude') {
-    const match = fallbackList.find(s => s.id === 'fitness');
-    if (match) return match;
-  }
-  if (lowerSec === 'familia' || lowerSec === 'pessoal' || lowerSec === 'personal' || lowerSec === 'vida pessoal') {
-    const match = fallbackList.find(s => s.id === 'family' || s.id === 'personal');
-    if (match) return match;
-  }
-  if (lowerSec === 'negocios' || lowerSec === 'clientes' || lowerSec === 'projetos') {
-    const match = fallbackList.find(s => s.id === 'business');
-    if (match) return match;
-  }
+  // 2. Mapeamento por nome (se o usuário renomeou ou cadastrou com o mesmo nome)
+  const lowerSec = sectorId.toLowerCase().trim();
+  const nameMatch = availableSectors.find(s => s.id.toLowerCase() === lowerSec || s.name.toLowerCase() === lowerSec);
+  if (nameMatch) return nameMatch;
 
-  // 3. Se ainda não achou, infere pelo título e resumo
-  if (title || summary) {
-    const inferredId = inferSectorFromContent(title, summary);
-    const inferredMatch = fallbackList.find(s => s.id === inferredId);
-    if (inferredMatch) return inferredMatch;
-  }
-
-  // 4. Fallback seguro: retorna o primeiro setor da lista disponível
-  return fallbackList[0] ?? initialSectors[0]!;
+  // Se o usuário não tem esse setor, retorna 'Sem setor'
+  return NO_SECTOR;
 }
 
 export const defaultCompanySectors: Sector[] = [
@@ -776,7 +758,7 @@ export const seedData = (withDemos = false): FlowData => {
     },
     workspaceMode: 'personal',
     companyWorkspace: undefined,
-    sectors: initialSectors.map(s => ({ ...s })),
+    sectors: withDemos ? initialSectors.map(s => ({ ...s })) : [],
     ideas: withDemos ? demoIdeas : [],
   };
 };
@@ -997,7 +979,7 @@ export function planIdea(text: string, sectors: Sector[], fiveWhys?: string[]): 
 
   const validWhys = fiveWhys?.filter(w => typeof w === 'string' && w.trim().length > 0);
   const extraContext = validWhys && validWhys.length > 0 ? ` ${validWhys.join(' ')}` : '';
-  const steps = generateAiSteps(title, `${text}${extraContext}`, sector?.id ?? 'personal', 'estruturado', validWhys);
+  const steps = generateAiSteps(title, `${text}${extraContext}`, sector?.id ?? 'none', 'estruturado', validWhys);
   const totalMinutes = steps.reduce((sum, s) => sum + s.minutes, 0);
 
   const scopeNote = validWhys && validWhys[0]
@@ -1008,7 +990,7 @@ export function planIdea(text: string, sectors: Sector[], fiveWhys?: string[]): 
     id: crypto.randomUUID(),
     title: title.charAt(0).toUpperCase() + title.slice(1),
     summary: text.trim().slice(0, 180),
-    sector: sector?.id ?? 'personal',
+    sector: sector?.id ?? 'none',
     priority,
     stage: 0,
     minutes: totalMinutes,

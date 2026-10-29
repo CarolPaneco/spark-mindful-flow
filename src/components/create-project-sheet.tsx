@@ -63,13 +63,13 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
   const isBusiness = data.workspaceMode === 'business';
   const currentWhysQuestions = getFiveWhysQuestions(isBusiness);
   const activeSectors = isBusiness
-    ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
-    : (data.sectors?.length ? data.sectors : initialSectors);
+    ? (data.companyWorkspace?.sectors || [])
+    : (data.sectors || []);
   const companyMembers = data.companyWorkspace?.members ?? [];
 
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
-  const [sector, setSector] = useState(activeSectors[0]?.id ?? 'tech');
+  const [sector, setSector] = useState(activeSectors[0]?.id ?? 'none');
   const [sectorManuallyChanged, setSectorManuallyChanged] = useState(false);
   const [priority, setPriority] = useState<Idea['priority']>('Importante');
   const [scope, setScope] = useState('');
@@ -451,6 +451,7 @@ export function CreateProjectSheet({ open, onClose, onOpenProject }: CreateProje
                       setSectorManuallyChanged(true);
                     }}
                   >
+                    <option value="none">Sem setor</option>
                     {activeSectors.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name}

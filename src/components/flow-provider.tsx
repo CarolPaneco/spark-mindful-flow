@@ -65,10 +65,10 @@ const FlowContext = createContext<FlowStore | null>(null);
 
 export function FlowProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<FlowData>(() => {
-    const base = seedData();
+    const base = seedData(false);
     return {
       ...base,
-      sectors: initialSectors.map(s => ({ ...s })),
+      sectors: [],
     };
   });
   const [ready, setReady] = useState(false);
@@ -195,10 +195,12 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // 1. Inicializa dados locais (sempre limpo de ideias mockadas demo-*)
+  // 1. Inicializa dados locais (isolado e limpo de resíduos)
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('ideaflow-v1');
+      const activeUserId = typeof window !== 'undefined' ? localStorage.getItem('ideaflow_active_user_id') : null;
+      const storageKey = activeUserId ? `ideaflow_data_${activeUserId}` : 'ideaflow-v1';
+      const stored = localStorage.getItem(storageKey);
       if (stored) {
         const parsed: unknown = JSON.parse(stored);
         if (isFlowData(parsed)) {
@@ -219,12 +221,13 @@ export function FlowProvider({ children }: { children: ReactNode }) {
           const cleanIdeas = (parsed.ideas || []).filter(
             i => !i.id.startsWith('demo-') && !i.id.startsWith('biz-') && i.companyId !== 'company-acme-corp'
           );
-          const cleanSectors = (parsed.sectors || []).filter(s => s.id !== 'wood');
-          const finalSectors = cleanSectors.length > 0 ? cleanSectors : initialSectors;
+          const cleanSectors = Array.isArray(parsed.sectors)
+            ? parsed.sectors.filter(s => s.id !== 'wood')
+            : [];
           setData({
             ...parsed,
             ideas: cleanIdeas,
-            sectors: finalSectors,
+            sectors: cleanSectors,
             companies: validCompanies,
             companyWorkspace: activeCompany,
             activeCompanyId: activeCompany?.id,
@@ -244,18 +247,22 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     void import('@/lib/pwa').then(m => m.registerOffline());
   }, []);
 
-  // 2. Salva localmente sempre que `data` muda
+  // 2. Salva localmente sempre que `data` muda com chave por usuário
   useEffect(() => {
     if (!ready) return;
     document.documentElement.classList.toggle('light', data.theme === 'light');
     document.documentElement.classList.toggle('dark', data.theme === 'dark');
     document.documentElement.dataset['palette'] = data.palette;
     try {
+      const activeUserId = user?.id || (typeof window !== 'undefined' ? localStorage.getItem('ideaflow_active_user_id') : null);
+      if (activeUserId) {
+        localStorage.setItem(`ideaflow_data_${activeUserId}`, JSON.stringify(data));
+      }
       localStorage.setItem('ideaflow-v1', JSON.stringify(data));
     } catch {
       toast.error('Não foi possível salvar. Exporte um backup para proteger suas ideias.');
     }
-  }, [data, ready]);
+  }, [data, ready, user?.id]);
 
   // 3. Monitora autenticação Supabase
   useEffect(() => {
@@ -289,16 +296,23 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     try {
       setIsSyncing(true);
 
-      // Proteção de isolamento entre contas: se trocou de usuário, limpa resíduos em memória
+      // Proteção de isolamento estrito entre contas: se trocou de usuário, limpa resíduos em memória
       const previousUserId = typeof window !== 'undefined' ? localStorage.getItem('ideaflow_active_user_id') : null;
       if (previousUserId && previousUserId !== currentUser.id) {
-        setData(prev => ({
-          ...prev,
+        setData({
+          ...seedData(false),
           ideas: [],
+          sectors: [],
+          profile: {
+            name: currentUser.email?.split('@')[0] || 'Criador(a)',
+            role: 'Criador(a)',
+            streak: 1,
+          },
+          workspaceMode: 'personal',
           companies: [],
           companyWorkspace: undefined,
           activeCompanyId: undefined,
-        }));
+        });
       }
       if (typeof window !== 'undefined') {
         localStorage.setItem('ideaflow_active_user_id', currentUser.id);
@@ -323,17 +337,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const resolvedSectors = (userProfile?.sectors && Array.isArray(userProfile.sectors) && userProfile.sectors.length > 0)
+      // Setores: apenas os setores reais deste usuário. Cada usuário é único, não generaliza!
+      const resolvedSectors = (userProfile?.sectors && Array.isArray(userProfile.sectors))
         ? userProfile.sectors
-        : initialSectors.map(s => ({ ...s }));
-
-      // Se o perfil remoto não tinha setores gravados, persiste imediatamente no Supabase
-      if (!userProfile?.sectors || !Array.isArray(userProfile.sectors) || userProfile.sectors.length === 0) {
-        void upsertUserProfile({
-          id: currentUser.id,
-          sectors: resolvedSectors,
-        });
-      }
+        : [];
 
       if (userProfile) {
         setProfile(userProfile);
@@ -351,6 +358,12 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       } else {
         setData(prev => ({
           ...prev,
+          profile: {
+            name: currentUser.email?.split('@')[0] || 'Criador(a)',
+            role: 'Criador(a)',
+            streak: 1,
+            personalPin: remotePin,
+          },
           sectors: resolvedSectors,
         }));
       }
@@ -657,10 +670,10 @@ export function FlowProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setPendingRequests([]);
-    setData(prev => ({
-      ...prev,
+    setData({
+      ...seedData(false),
       ideas: [],
-      sectors: initialSectors.map(s => ({ ...s })),
+      sectors: [],
       profile: {
         name: 'Criador(a)',
         role: 'Criador(a)',
@@ -670,7 +683,7 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       companies: [],
       companyWorkspace: undefined,
       activeCompanyId: undefined,
-    }));
+    });
     try {
       sessionStorage.removeItem('ideaflow_session_unlocked');
       localStorage.removeItem('ideaflow-v1');

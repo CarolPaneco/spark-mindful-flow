@@ -66,9 +66,7 @@ export function rowToIdea(row: any): Idea {
     : '';
 
   const rawSector = row.sector || extraMeta.sector;
-  const resolvedSector = (rawSector && rawSector !== 'personal' && rawSector !== 'geral')
-    ? rawSector
-    : inferSectorFromContent(row.title, cleanSummary);
+  const resolvedSector = (rawSector && rawSector !== 'geral') ? rawSector : 'none';
 
   return {
     id: row.id,
@@ -125,7 +123,7 @@ export function ideaToRow(idea: Idea, userId: string, companyId?: string) {
     user_id: userId,
     title: idea.title,
     summary: `${cleanSummary}${metaComment}`,
-    sector: idea.sector || 'personal',
+    sector: idea.sector || 'none',
     priority: idea.priority || 'Normal',
     stage: idea.stage ?? 0,
     minutes: idea.minutes ?? 60,

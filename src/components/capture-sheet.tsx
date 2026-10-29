@@ -284,8 +284,8 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
 
   const isBusiness = data.workspaceMode === 'business';
   const activeSectors = isBusiness
-    ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
-    : (data.sectors?.length ? data.sectors : initialSectors);
+    ? (data.companyWorkspace?.sectors || [])
+    : (data.sectors || []);
   const companyMembers = data.companyWorkspace?.members ?? [];
 
   const handleGenerateDraft = async () => {
@@ -609,6 +609,7 @@ export function CaptureSheet({ open, onClose }: { open: boolean; onClose: () => 
                       });
                     }}
                   >
+                    <option value="none">Sem setor</option>
                     {activeSectors.map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name}

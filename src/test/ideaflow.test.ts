@@ -16,6 +16,8 @@ import {
   defaultTeamMembers,
   createStarterBusinessIdeas,
   generateAiSteps,
+  resolveSector,
+  NO_SECTOR,
 } from '@/lib/ideaflow';
 
 describe('Ideaflow offline engine', () => {
@@ -236,5 +238,30 @@ describe('Ideaflow offline engine', () => {
     expect(combinedText).not.toContain('público-alvo');
     // DOES contain media/vlog related keywords
     expect(combinedText).toMatch(/vlog|grava|show|aeroporto|clipe|bateria/);
+  });
+
+  it('strictly isolates user sectors and avoids generalizing preset sectors', () => {
+    // Novo usuário padrão começa sem setores pré-definidos
+    const freshData = seedData(false);
+    expect(freshData.sectors).toEqual([]);
+
+    // resolveSector sem setores disponíveis retorna sempre 'Sem setor'
+    const unresolved1 = resolveSector('tech', []);
+    expect(unresolved1.name).toBe('Sem setor');
+    expect(unresolved1.id).toBe(NO_SECTOR.id);
+
+    const unresolved2 = resolveSector('none', []);
+    expect(unresolved2.name).toBe('Sem setor');
+
+    // Apenas setores que o próprio usuário cadastrou são reconhecidos
+    const customSectors = [
+      { id: 'musica-01', name: 'Produção Musical', tone: 'violet' as const },
+    ];
+    const resolved = resolveSector('musica-01', customSectors);
+    expect(resolved.name).toBe('Produção Musical');
+
+    // Não herda setores de outros usuários por inferência arbitrária
+    const unknownSector = resolveSector('fitness', customSectors);
+    expect(unknownSector.name).toBe('Sem setor');
   });
 });

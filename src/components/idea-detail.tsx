@@ -600,8 +600,8 @@ export function IdeaDetail({
               {resolveSector(
                 idea.sector,
                 idea.workspace === 'business'
-                  ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
-                  : (data.sectors?.length ? data.sectors : initialSectors),
+                  ? (data.companyWorkspace?.sectors || [])
+                  : (data.sectors || []),
                 idea.title,
                 idea.summary
               ).name}
@@ -820,22 +820,23 @@ export function IdeaDetail({
                       onChange={e => {
                         const newSecId = e.target.value;
                         const applicableSectors = idea.workspace === 'business'
-                          ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
-                          : (data.sectors?.length ? data.sectors : initialSectors);
+                          ? (data.companyWorkspace?.sectors || [])
+                          : (data.sectors || []);
                         const secObj = applicableSectors.find(s => s.id === newSecId);
                         updateIdea(idea.id, {
                           sector: newSecId,
                           department: idea.workspace === 'business' ? (secObj ? secObj.name : undefined) : undefined,
                         });
-                        toast.success(`Setor atualizado para "${secObj?.name || newSecId}"!`);
+                        toast.success(`Setor atualizado para "${secObj?.name || (newSecId === 'none' ? 'Sem setor' : newSecId)}"!`);
                       }}
                     >
+                      <option value="none">Sem setor</option>
                       {idea.workspace === 'business' ? (
-                        (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors).map(s => (
+                        (data.companyWorkspace?.sectors || []).map(s => (
                           <option key={`biz-${s.id}`} value={s.id}>{s.name}</option>
                         ))
                       ) : (
-                        (data.sectors?.length ? data.sectors : initialSectors).map(s => (
+                        (data.sectors || []).map(s => (
                           <option key={`per-${s.id}`} value={s.id}>{s.name}</option>
                         ))
                       )}
@@ -1037,8 +1038,8 @@ export function IdeaDetail({
                     onChange={e => {
                       const newSecId = e.target.value;
                       const applicableSectors = idea.workspace === 'business'
-                        ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
-                        : (data.sectors?.length ? data.sectors : initialSectors);
+                        ? (data.companyWorkspace?.sectors || [])
+                        : (data.sectors || []);
                       const secObj = applicableSectors.find(s => s.id === newSecId);
                       updateIdea(idea.id, {
                         sector: newSecId,
@@ -1046,9 +1047,10 @@ export function IdeaDetail({
                       });
                     }}
                   >
+                    <option value="none">Sem setor</option>
                     {(idea.workspace === 'business'
-                      ? (data.companyWorkspace?.sectors?.length ? data.companyWorkspace.sectors : defaultCompanySectors)
-                      : (data.sectors?.length ? data.sectors : initialSectors)
+                      ? (data.companyWorkspace?.sectors || [])
+                      : (data.sectors || [])
                     ).map(s => (
                       <option key={s.id} value={s.id}>
                         {s.name}

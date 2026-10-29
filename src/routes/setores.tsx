@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
 import { useFlow } from '@/components/flow-provider';
+import { upsertUserProfile } from '@/lib/supabase';
 import { IdeaCard } from '@/components/idea-card';
 import { IdeaDetail } from '@/components/idea-detail';
 import { FocusTimer } from '@/components/focus-timer';
@@ -144,7 +145,7 @@ function getTemplateIcon(iconName: string) {
 }
 
 function Sectors() {
-  const { data, setData } = useFlow();
+  const { data, setData, user } = useFlow();
   const [mounted, setMounted] = useState(false);
 
   // Estados de Criação de Setor
@@ -179,18 +180,9 @@ function Sectors() {
   const isBusiness = data.workspaceMode === 'business';
   const company = data.companyWorkspace;
   const readyTemplates = getReadySectorTemplates(isBusiness);
-  const companySectors = (company?.sectors && company.sectors.length > 0) ? company.sectors : defaultCompanySectors;
-  const userSectors = (data.sectors && data.sectors.length > 0) ? data.sectors : initialSectors;
+  const companySectors = company?.sectors || [];
+  const userSectors = data.sectors || [];
   const currentSectors = isBusiness && company ? companySectors : userSectors;
-
-  useEffect(() => {
-    if (!isBusiness && (!data.sectors || data.sectors.length === 0)) {
-      setData(prev => ({
-        ...prev,
-        sectors: initialSectors.map(s => ({ ...s })),
-      }));
-    }
-  }, [isBusiness, data.sectors, setData]);
   const workspaceIdeas = data.ideas.filter(i => isBusiness ? i.workspace === 'business' : i.workspace !== 'business');
 
   const activeIdeas = workspaceIdeas.filter(i => !i.archived);
@@ -214,10 +206,10 @@ function Sectors() {
     const sectorId = deletingSector.id;
     const sectorName = deletingSector.name;
 
-    setData(prev => {
-      const remainingSectors = prev.sectors.filter(s => s.id !== sectorId);
-      const targetSector = reassignSectorId || (remainingSectors[0]?.id ?? 'geral');
+    const remainingSectors = data.sectors.filter(s => s.id !== sectorId);
+    const targetSector = reassignSectorId || (remainingSectors[0]?.id ?? 'none');
 
+    setData(prev => {
       const updatedIdeas = prev.ideas.map(i => {
         if (i.sector === sectorId) {
           return { ...i, sector: targetSector };
@@ -231,6 +223,10 @@ function Sectors() {
         ideas: updatedIdeas,
       };
     });
+
+    if (user?.id) {
+      void upsertUserProfile({ id: user.id, sectors: remainingSectors });
+    }
 
     toast.success(`Setor "${sectorName}" excluído com sucesso.`);
     setDeletingSector(null);
@@ -251,13 +247,18 @@ function Sectors() {
   const confirmEditSector = () => {
     if (!editingSector || !editName.trim()) return;
     const trimmed = editName.trim();
+    const updatedSectors = data.sectors.map(s =>
+      s.id === editingSector.id ? { ...s, name: trimmed, tone: editTone } : s
+    );
 
     setData(prev => ({
       ...prev,
-      sectors: prev.sectors.map(s =>
-        s.id === editingSector.id ? { ...s, name: trimmed, tone: editTone } : s
-      ),
+      sectors: updatedSectors,
     }));
+
+    if (user?.id) {
+      void upsertUserProfile({ id: user.id, sectors: updatedSectors });
+    }
 
     toast.success(`Setor atualizado para "${trimmed}"!`);
     setEditingSector(null);
@@ -275,15 +276,19 @@ function Sectors() {
     };
 
     const starterIdeas = withIdeas ? buildStarterIdeasForSector(sectorId, template) : [];
+    const sectorsList = existing ? data.sectors : [...data.sectors, newSector];
 
     setData(prev => {
-      const sectorsList = existing ? prev.sectors : [...prev.sectors, newSector];
       return {
         ...prev,
         sectors: sectorsList,
         ideas: [...prev.ideas, ...starterIdeas],
       };
     });
+
+    if (user?.id) {
+      void upsertUserProfile({ id: user.id, sectors: sectorsList });
+    }
 
     toast.success(
       `Setor "${template.name}" ${existing ? 'atualizado' : 'criado'} com sucesso! ${
@@ -341,7 +346,7 @@ function Sectors() {
       </div>
 
       {/* CASO ESPECIAL: 0 SETORES CADASTRADOS -> PRIMEIRA MISSÃO COM MODELOS PRONTOS */}
-      {data.sectors.length === 0 ? (
+      {currentSectors.length === 0 ? (
         <section className="mt-8">
           <div className="p-6 sm:p-8 rounded-2xl border-2 border-primary/40 bg-gradient-to-b from-card to-card/60 relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
@@ -685,10 +690,15 @@ function Sectors() {
               }
               className="primary-action w-full mt-6"
               onClick={() => {
+                const newSectorObj = { id: crypto.randomUUID(), name: name.trim(), tone };
+                const updatedSectors = [...data.sectors, newSectorObj];
                 setData(p => ({
                   ...p,
-                  sectors: [...p.sectors, { id: crypto.randomUUID(), name: name.trim(), tone }],
+                  sectors: updatedSectors,
                 }));
+                if (user?.id) {
+                  void upsertUserProfile({ id: user.id, sectors: updatedSectors });
+                }
                 setName('');
                 setCreate(false);
                 toast.success(`Setor "${name.trim()}" criado com sucesso!`);
