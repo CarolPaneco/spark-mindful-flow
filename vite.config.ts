@@ -110,8 +110,10 @@ export default defineConfig(({ command }) => ({
       devOptions: { enabled: false },
       manifest: false,
       workbox: {
+        clientsClaim: true,
+        skipWaiting: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,png,ico,svg,woff2}"],
-        additionalManifestEntries: [{ url: "/", revision: "ideaflow-v1" }],
         navigateFallback: null,
         runtimeCaching: [
           {
@@ -122,19 +124,18 @@ export default defineConfig(({ command }) => ({
             handler: "NetworkFirst",
             options: {
               cacheName: "ideaflow-pages",
-              networkTimeoutSeconds: 5,
-              precacheFallback: { fallbackURL: "/" },
-              expiration: { maxEntries: 12 },
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 20 },
             },
           },
           {
             urlPattern: ({ url }) =>
               url.origin === self.location.origin &&
               /\/assets\/.*-[\w-]+\.(js|css|png|woff2)$/.test(url.pathname),
-            handler: "CacheFirst",
+            handler: "StaleWhileRevalidate",
             options: {
               cacheName: "ideaflow-assets",
-              expiration: { maxEntries: 120, maxAgeSeconds: 2592000 },
+              expiration: { maxEntries: 120, maxAgeSeconds: 86400 },
             },
           },
         ],

@@ -57,10 +57,22 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   // Se for erro de cache de bundle antigo após novo deploy, auto-recarrega a página para obter a versão atual
   useEffect(() => {
     if (typeof window !== 'undefined' && isChunkError) {
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(regs => {
+            for (const reg of regs) void reg.unregister();
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(keys => {
+            for (const key of keys) void caches.delete(key);
+          });
+        }
+      } catch {}
       const reloadKey = 'ideaflow_chunk_reload';
       const lastReload = sessionStorage.getItem(reloadKey);
       const now = Date.now();
-      if (!lastReload || now - Number(lastReload) > 10000) {
+      if (!lastReload || now - Number(lastReload) > 5000) {
         sessionStorage.setItem(reloadKey, String(now));
         window.location.reload();
       }
@@ -168,6 +180,53 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="pt-BR">
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function purgeAndReload() {
+                  try {
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then(function(regs) {
+                        for (var i = 0; i < regs.length; i++) regs[i].unregister();
+                      });
+                    }
+                    if ('caches' in window) {
+                      caches.keys().then(function(keys) {
+                        for (var i = 0; i < keys.length; i++) caches.delete(keys[i]);
+                      });
+                    }
+                  } catch(e) {}
+                  var lastReload = sessionStorage.getItem('ideaflow_chunk_reload');
+                  var now = Date.now();
+                  if (!lastReload || now - Number(lastReload) > 5000) {
+                    sessionStorage.setItem('ideaflow_chunk_reload', String(now));
+                    window.location.reload();
+                  }
+                }
+
+                window.addEventListener('vite:preloadError', function(event) {
+                  event.preventDefault();
+                  purgeAndReload();
+                });
+
+                window.addEventListener('error', function(event) {
+                  if (event && event.message && event.message.indexOf('dynamically imported module') !== -1) {
+                    event.preventDefault();
+                    purgeAndReload();
+                  }
+                });
+
+                window.addEventListener('unhandledrejection', function(event) {
+                  if (event && event.reason && String(event.reason).indexOf('dynamically imported module') !== -1) {
+                    event.preventDefault();
+                    purgeAndReload();
+                  }
+                });
+              })();
+            `,
+          }}
+        />
       </head>
       <body>
         {children}

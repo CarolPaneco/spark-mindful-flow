@@ -55,6 +55,47 @@ import {
   type Sector,
 } from '@/lib/ideaflow';
 
+function SetoresErrorComponent() {
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(regs => {
+            for (const reg of regs) void reg.unregister();
+          });
+        }
+        if ('caches' in window) {
+          caches.keys().then(keys => {
+            for (const key of keys) void caches.delete(key);
+          });
+        }
+      } catch {}
+      const reloadKey = 'ideaflow_setores_reload';
+      const last = sessionStorage.getItem(reloadKey);
+      const now = Date.now();
+      if (!last || now - Number(last) > 5000) {
+        sessionStorage.setItem(reloadKey, String(now));
+        window.location.reload();
+      }
+    }
+  }, []);
+
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center">
+      <h2 className="text-lg font-semibold text-foreground">Atualizando painel de setores...</h2>
+      <p className="text-xs text-muted-foreground mt-1">Sincronizando com a versão mais recente do aplicativo.</p>
+      <button
+        onClick={() => {
+          if (typeof window !== 'undefined') window.location.reload();
+        }}
+        className="mt-4 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold cursor-pointer"
+      >
+        Atualizar agora ⚡
+      </button>
+    </div>
+  );
+}
+
 export const Route = createFileRoute('/setores')({
   head: () => ({
     meta: [
@@ -72,6 +113,7 @@ export const Route = createFileRoute('/setores')({
       { name: 'twitter:card', content: 'summary_large_image' },
     ],
   }),
+  errorComponent: SetoresErrorComponent,
   component: Sectors,
 });
 
