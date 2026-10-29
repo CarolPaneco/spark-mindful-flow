@@ -130,24 +130,24 @@ function Today() {
           <p className="page-subtitle capitalize">{dateText}</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="segmented p-1">
+        <div className="w-full sm:w-auto mt-2 sm:mt-0">
+          <div className="segmented p-1 w-full sm:w-auto grid grid-cols-2 sm:flex h-10 sm:h-9">
             <Button
               variant="ghost"
               size="sm"
-              className={`h-8 text-xs gap-1.5 ${viewMode === 'blocks' ? 'selected' : ''}`}
+              className={`h-full text-xs font-medium gap-1.5 justify-center flex-1 sm:flex-initial ${viewMode === 'blocks' ? 'selected font-semibold' : ''}`}
               onClick={() => setViewMode('blocks')}
             >
-              <Sun size={13} />
+              <Sun size={14} />
               Blocos do Dia
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className={`h-8 text-xs gap-1.5 ${viewMode === 'calendar' ? 'selected' : ''}`}
+              className={`h-full text-xs font-medium gap-1.5 justify-center flex-1 sm:flex-initial ${viewMode === 'calendar' ? 'selected font-semibold' : ''}`}
               onClick={() => setViewMode('calendar')}
             >
-              <CalendarRange size={13} />
+              <CalendarRange size={14} />
               Calendário Mensal
             </Button>
           </div>
@@ -155,7 +155,7 @@ function Today() {
       </div>
 
       {/* Métricas do Dia Selecionado */}
-      <div className="day-metrics">
+      <div className="day-metrics grid grid-cols-3 gap-2 sm:gap-10 py-3 sm:py-5 border-y border-border my-4 sm:my-6">
         <div>
           <strong className="text-primary">
             {formatMinutes(scheduled.reduce((n, i) => n + i.minutes, 0))}

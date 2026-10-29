@@ -28,7 +28,7 @@ import {
   X,
   Wand2,
 } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, Tooltip } from 'recharts';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from '@/components/ui/drawer';
@@ -315,11 +315,11 @@ function Sectors() {
             Acompanhe o desenvolvimento de cada área da sua vida e identifique onde acelerar.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto mt-2 sm:mt-0">
           <Button
             variant="outline"
             size="sm"
-            className="text-xs h-9 gap-1.5"
+            className="text-xs h-9 gap-1.5 flex-1 sm:flex-initial justify-center rounded-xl"
             onClick={() => setShowTemplatesModal(true)}
           >
             <Sparkles size={14} className="text-amber" />
@@ -330,7 +330,7 @@ function Sectors() {
             <Button
               variant="outline"
               size="sm"
-              className="text-xs h-9 gap-1.5"
+              className="text-xs h-9 gap-1.5 flex-1 sm:flex-initial justify-center rounded-xl"
               onClick={() => setShowGlobalCharts(!showGlobalCharts)}
             >
               <BarChart3 size={14} className="text-primary" />
@@ -338,8 +338,12 @@ function Sectors() {
             </Button>
           )}
 
-          <Button aria-label="Novo setor" className="new-idea" onClick={() => setCreate(true)}>
-            <Plus />
+          <Button
+            aria-label="Novo setor"
+            className="new-idea flex-1 sm:flex-initial justify-center h-9 sm:h-[43px] rounded-xl font-semibold gap-1.5"
+            onClick={() => setCreate(true)}
+          >
+            <Plus size={16} />
             <span className="button-label">Novo setor</span>
           </Button>
         </div>
@@ -521,28 +525,55 @@ function Sectors() {
 
             {/* Gráficos Comparativos Gerais com Recharts */}
             {showGlobalCharts && mounted && comparison.chartData.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5 rounded-xl border border-border bg-card/60">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 sm:p-5 rounded-xl border border-border bg-card/60">
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                       <BarChart3 size={14} className="text-primary" />
                       Ideias por Setor (Total vs Realizadas)
                     </span>
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      {comparison.chartData.length} setor(es)
+                    </span>
                   </div>
-                  <div className="h-48 w-full">
+                  <div className="h-56 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={comparison.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
-                        <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} />
+                      <BarChart data={comparison.chartData} margin={{ top: 10, right: 10, left: -15, bottom: 45 }}>
+                        <XAxis
+                          dataKey="name"
+                          stroke="var(--muted-foreground)"
+                          fontSize={10}
+                          interval={0}
+                          angle={-25}
+                          textAnchor="end"
+                          height={45}
+                          tickFormatter={(val: string) => (val && val.length > 12 ? `${val.slice(0, 11)}…` : val)}
+                        />
                         <YAxis stroke="var(--muted-foreground)" fontSize={11} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'var(--card)',
                             borderColor: 'var(--border)',
+                            borderRadius: '8px',
                             fontSize: '12px',
                           }}
+                          labelFormatter={(label) => `Setor: ${label}`}
                         />
-                        <Bar dataKey="total" name="Total de Ideias" fill="var(--secondary)" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="concluidas" name="Realizadas" fill="var(--green)" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total" name="Total de Ideias" radius={[4, 4, 0, 0]}>
+                          {comparison.chartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-total-${index}`}
+                              fill={`${entry.color}45`}
+                              stroke={entry.color}
+                              strokeWidth={1}
+                            />
+                          ))}
+                        </Bar>
+                        <Bar dataKey="concluidas" name="Realizadas" radius={[4, 4, 0, 0]}>
+                          {comparison.chartData.map((entry, index) => (
+                            <Cell key={`cell-done-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -554,24 +585,56 @@ function Sectors() {
                       <Clock size={14} className="text-violet" />
                       Horas de Foco Dedicadas por Setor
                     </span>
+                    <span className="text-[11px] text-muted-foreground font-mono">
+                      Tempo Real
+                    </span>
                   </div>
-                  <div className="h-48 w-full">
+                  <div className="h-56 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={comparison.chartData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
-                        <XAxis dataKey="name" stroke="var(--muted-foreground)" fontSize={11} />
+                      <BarChart data={comparison.chartData} margin={{ top: 10, right: 10, left: -10, bottom: 45 }}>
+                        <XAxis
+                          dataKey="name"
+                          stroke="var(--muted-foreground)"
+                          fontSize={10}
+                          interval={0}
+                          angle={-25}
+                          textAnchor="end"
+                          height={45}
+                          tickFormatter={(val: string) => (val && val.length > 12 ? `${val.slice(0, 11)}…` : val)}
+                        />
                         <YAxis stroke="var(--muted-foreground)" fontSize={11} unit="h" />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: 'var(--card)',
                             borderColor: 'var(--border)',
+                            borderRadius: '8px',
                             fontSize: '12px',
                           }}
                           formatter={(val: any) => [`${val} horas`, 'Tempo']}
+                          labelFormatter={(label) => `Setor: ${label}`}
                         />
-                        <Bar dataKey="horasDedicadas" name="Horas de Foco" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="horasDedicadas" name="Horas de Foco" radius={[4, 4, 0, 0]}>
+                          {comparison.chartData.map((entry, index) => (
+                            <Cell key={`cell-hours-${index}`} fill={entry.color} />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                </div>
+
+                {/* Legenda visual colorida dos setores */}
+                <div className="md:col-span-2 pt-3 border-t border-border/50 flex items-center gap-2.5 flex-wrap">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Cores dos Setores:</span>
+                  {comparison.chartData.map(entry => (
+                    <span
+                      key={entry.sectorId || entry.name}
+                      className="inline-flex items-center gap-1.5 text-xs text-foreground bg-secondary/60 px-2 py-0.5 rounded-md border border-border/40"
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: entry.color }} />
+                      <span className="font-medium">{entry.name}</span>
+                    </span>
+                  ))}
                 </div>
               </div>
             )}

@@ -134,11 +134,11 @@ function Index() {
         </div>
 
         {/* Botões lado a lado: Novo Projeto e Nova Ideia */}
-        <div className="action-buttons flex items-center gap-2 shrink-0">
+        <div className="action-buttons flex items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <Button
             aria-label="Novo projeto"
             variant="outline"
-            className="border-violet/40 bg-violet/10 text-violet hover:bg-violet/20 hover:text-violet gap-1.5 h-9 sm:h-[43px] px-3 sm:px-3.5 text-xs sm:text-sm font-semibold rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer"
+            className="border-violet/40 bg-violet/10 text-violet hover:bg-violet/20 hover:text-violet gap-1.5 h-10 sm:h-[43px] px-3.5 text-xs sm:text-sm font-semibold rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer flex-1 sm:flex-initial justify-center"
             onClick={() => setCreateProjectOpen(true)}
             title="Criar um novo projeto estruturado com ideias dentro"
           >
@@ -148,7 +148,7 @@ function Index() {
 
           <Button
             aria-label="Nova ideia"
-            className="new-idea gap-1.5 cursor-pointer h-9 sm:h-[43px] px-3.5 sm:px-4 text-xs sm:text-sm font-semibold rounded-xl active:scale-95 transition-all shadow-xs"
+            className="new-idea gap-1.5 cursor-pointer h-10 sm:h-[43px] px-4 text-xs sm:text-sm font-semibold rounded-xl active:scale-95 transition-all shadow-xs flex-1 sm:flex-initial justify-center"
             onClick={capture}
             title="Capturar uma nova ideia rápida"
           >
@@ -209,14 +209,14 @@ function Index() {
         </div>
       )}
 
-      <div className="funnel-toolbar">
-        <div className="filter-row">
-          {/* Filtro de Escopo: Todos, Projetos ou Ideias Avulsas */}
-          <div className="segmented p-0.5 border border-border/80">
+      <div className="funnel-toolbar flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-3 border-t border-border">
+        {/* Filtro de Escopo: no mobile ocupa 100% como grid de 3 colunas perfeitamente simétricas */}
+        <div className="w-full sm:w-auto">
+          <div className="segmented p-0.5 border border-border/80 w-full sm:w-auto grid grid-cols-3 sm:flex h-9 sm:h-8">
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 px-2.5 text-xs ${scopeFilter === 'all' ? 'selected' : ''}`}
+              className={`h-full text-xs font-medium justify-center flex-1 sm:flex-initial ${scopeFilter === 'all' ? 'selected' : ''}`}
               onClick={() => setScopeFilter('all')}
             >
               Tudo
@@ -224,30 +224,30 @@ function Index() {
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 px-2.5 text-xs gap-1 ${scopeFilter === 'projects' ? 'selected text-violet font-semibold' : ''}`}
+              className={`h-full text-xs font-medium gap-1 justify-center flex-1 sm:flex-initial ${scopeFilter === 'projects' ? 'selected text-violet font-semibold' : ''}`}
               onClick={() => setScopeFilter('projects')}
               title="Filtrar apenas Projetos Macro"
             >
               <FolderTree size={12} />
-              Projetos ({complexProjectsCount})
+              <span>Projetos ({complexProjectsCount})</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
-              className={`h-7 px-2.5 text-xs ${scopeFilter === 'standalone' ? 'selected' : ''}`}
+              className={`h-full text-xs font-medium justify-center flex-1 sm:flex-initial ${scopeFilter === 'standalone' ? 'selected' : ''}`}
               onClick={() => setScopeFilter('standalone')}
               title="Filtrar apenas ideias individuais"
             >
               Avulsas
             </Button>
           </div>
+        </div>
 
-          <span className="stats-divider hidden sm:inline" />
-
-          {/* Filtro de Setor */}
+        {/* Linha de Setores com rolagem horizontal suave e alinhamento reto */}
+        <div className="filter-row flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5 w-full">
           <Button
             variant="ghost"
-            className={`filter-button ${sector === 'all' ? 'selected' : ''}`}
+            className={`filter-button h-8 shrink-0 text-xs px-3 rounded-lg border ${sector === 'all' ? 'selected' : 'border-border/40'}`}
             onClick={() => setSector('all')}
           >
             Todos os setores
@@ -256,7 +256,7 @@ function Index() {
             <Button
               variant="ghost"
               key={s.id}
-              className={`filter-button tone-${s.tone} ${sector === s.id ? 'selected' : ''}`}
+              className={`filter-button tone-${s.tone} h-8 shrink-0 text-xs px-3 rounded-lg border ${sector === s.id ? 'selected' : 'border-border/40'}`}
               onClick={() => setSector(s.id)}
             >
               <Circle className={`text-${s.tone}`} fill="currentColor" />
@@ -265,7 +265,7 @@ function Index() {
           ))}
           <Button
             variant="ghost"
-            className={`filter-button ${showArchived ? 'selected text-amber border-amber/40 bg-amber/10' : ''}`}
+            className={`filter-button h-8 shrink-0 text-xs px-3 rounded-lg border ${showArchived ? 'selected text-amber border-amber/40 bg-amber/10' : 'border-border/40'}`}
             onClick={() => setShowArchived(!showArchived)}
             title="Alternar entre ideias ativas e arquivadas"
           >

@@ -1173,12 +1173,61 @@ export function calculateSectorAnalytics(sector: Sector, ideas: Idea[], allSecto
 /**
  * Análise comparativa macro de todos os setores.
  */
+export const SECTOR_TONE_COLORS: Record<string, string> = {
+  cyan: '#06B6D4',
+  violet: '#8B5CF6',
+  amber: '#F59E0B',
+  green: '#10B981',
+  pink: '#F43F5E',
+  indigo: '#6366F1',
+  rose: '#FB7185',
+  teal: '#14B8A6',
+  orange: '#F97316',
+  blue: '#3B82F6',
+};
+
+export const DISTINCT_SECTOR_PALETTE: string[] = [
+  '#06B6D4', // Ciano
+  '#8B5CF6', // Violeta
+  '#10B981', // Verde Esmeralda
+  '#F59E0B', // Âmbar / Ouro
+  '#F43F5E', // Rosa / Coral
+  '#3B82F6', // Azul Royal
+  '#F97316', // Laranja
+  '#14B8A6', // Teal
+  '#EC4899', // Pink Forte
+  '#6366F1', // Indigo
+  '#84CC16', // Lima
+  '#EAB308', // Amarelo
+];
+
+export function getSectorDistinctColor(tone?: string, index: number = 0, usedColors?: Set<string>): string {
+  const toneColor = tone ? SECTOR_TONE_COLORS[tone] : undefined;
+  if (toneColor && (!usedColors || !usedColors.has(toneColor))) {
+    usedColors?.add(toneColor);
+    return toneColor;
+  }
+  if (usedColors) {
+    const available = DISTINCT_SECTOR_PALETTE.find(c => !usedColors.has(c));
+    if (available) {
+      usedColors.add(available);
+      return available;
+    }
+  }
+  const fallback = DISTINCT_SECTOR_PALETTE[index % DISTINCT_SECTOR_PALETTE.length] || '#06B6D4';
+  usedColors?.add(fallback);
+  return fallback;
+}
+
 export interface GlobalSectorsAnalysis {
   mostDeveloped: SectorAnalytics | null;
   mostDelayed: SectorAnalytics | null;
   sectorMetrics: SectorAnalytics[];
   chartData: {
     name: string;
+    sectorId: string;
+    tone: string;
+    color: string;
     total: number;
     concluidas: number;
     horasDedicadas: number;
@@ -1209,8 +1258,12 @@ export function calculateGlobalSectorComparison(sectors: Sector[], ideas: Idea[]
 
   const mostDelayed = sortedByDelay[0] && sortedByDelay[0].sector.id !== mostDeveloped?.sector.id ? sortedByDelay[0] : (sortedByDelay[1] ?? sortedByDelay[0] ?? null);
 
-  const chartData = sectorMetrics.map(m => ({
+  const usedColors = new Set<string>();
+  const chartData = sectorMetrics.map((m, index) => ({
     name: m.sector.name,
+    sectorId: m.sector.id,
+    tone: m.sector.tone,
+    color: getSectorDistinctColor(m.sector.tone, index, usedColors),
     total: m.totalIdeas,
     concluidas: m.completedIdeas,
     horasDedicadas: Number((m.totalMinutesDedicated / 60).toFixed(1)),

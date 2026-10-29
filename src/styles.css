@@ -370,21 +370,27 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .greeting-row { margin-bottom: 12px; }
   .greeting { font-size: 15px; font-weight: 600; }
   .local-status { font-size: 11px; }
-  .page-heading { align-items: flex-start; gap: 12px; }
+  .page-heading { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+  .page-heading > div:first-child { width: 100%; }
   .page-heading h1 { font-size: 26px; max-width: none; font-weight: 700; line-height: 1.25; }
   .page-subtitle { font-size: 13.5px; line-height: 1.5; max-width: none; margin-top: 6px; }
+  .action-buttons { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .action-buttons > button { width: 100%; height: 40px; justify-content: center; }
   .new-idea { padding: 0 14px; height: 38px; font-size: 12px; border-radius: 8px; }
-  .stats-bar { margin: 18px 0; gap: 14px; font-size: 11.5px; flex-wrap: wrap; }
+  .stats-bar { margin: 16px 0; gap: 12px; font-size: 11.5px; flex-wrap: wrap; }
   .stats-bar svg { width: 14px; height: 14px; }
   .spark-note { display: none !important; }
   .stats-divider { display: none !important; }
-  .funnel-toolbar { padding: 14px 0; display: block; }
-  .filter-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; padding-bottom: 2px; -webkit-overflow-scrolling: touch; }
-  .filter-button { padding: 0 12px; flex-shrink: 0; font-size: 11.5px; height: 33px; border-radius: 8px; font-weight: 500; }
+  .funnel-toolbar { padding: 12px 0; display: flex; flex-direction: column; gap: 10px; width: 100%; }
+  .filter-row { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 7px; padding: 2px 0; -webkit-overflow-scrolling: touch; width: 100%; }
+  .filter-button { padding: 0 12px; flex-shrink: 0; font-size: 11.5px; height: 32px; border-radius: 8px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
   .toolbar-right { display: none; }
-  .mobile-stages { display: flex; gap: 6px; margin: 4px -16px 14px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-  .mobile-stages button { font-size: 11.5px; height: 33px; padding: 0 11px; color: var(--muted-foreground); flex-shrink: 0; font-weight: 600; border-radius: 8px; }
-  .mobile-stages button.selected { background: color-mix(in oklch,var(--tone) 12%,transparent); color: var(--tone); }
+  .mobile-stages { display: flex; gap: 6px; margin: 6px -16px 14px; padding: 2px 16px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .mobile-stages button { font-size: 11.5px; height: 34px; padding: 0 12px; color: var(--muted-foreground); background: var(--card); border: 1px solid var(--border); flex-shrink: 0; font-weight: 600; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
+  .mobile-stages button.selected { background: color-mix(in oklch, var(--tone) 16%, var(--card)); color: var(--tone); border-color: color-mix(in oklch, var(--tone) 45%, transparent); box-shadow: 0 2px 8px color-mix(in oklch, var(--tone) 20%, transparent); }
+  .day-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .day-metrics strong { font-size: 20px; }
+  .day-metrics span { font-size: 10.5px; line-height: 1.3; }
   .kanban { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px 14px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   .kanban-column { flex: 0 0 calc(100vw - 44px); scroll-snap-align: center; }
   .stage-heading { height: 36px; }
