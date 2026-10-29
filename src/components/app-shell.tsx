@@ -691,10 +691,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             const tourId = item.to === '/' ? 'funil' : item.to === '/hoje' ? 'hoje' : item.to === '/setores' ? 'setores' : 'ajustes';
             const shortName = item.to === '/' ? (isBusiness ? 'Empresa' : 'Funil') : item.to === '/setores' ? 'Setores' : item.name;
             return (
-              <div key={item.to} className={`nav-slot slot-${i}`} data-tour={tourId}>
+              <div key={item.to} className={`nav-slot slot-${i} flex items-center justify-center w-full h-full`} data-tour={tourId}>
                 <Link
                   to={item.to}
-                  className={`nav-item ${path === item.to ? 'active' : ''}`}
+                  className={`nav-item flex flex-col items-center justify-center text-center ${path === item.to ? 'active' : ''}`}
                 >
                   <item.icon />
                   <span>{shortName}</span>
@@ -704,7 +704,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           })}
           <button
             type="button"
-            className="capture-fab"
+            className="capture-fab flex items-center justify-center cursor-pointer"
             aria-label="Capturar ideia"
             title="Capturar ideia"
             data-tour="capture"
