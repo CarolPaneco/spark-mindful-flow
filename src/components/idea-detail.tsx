@@ -113,6 +113,7 @@ export function IdeaDetail({
   const [editingFiveWhys, setEditingFiveWhys] = useState(false);
   const [localFiveWhys, setLocalFiveWhys] = useState<string[]>(['', '', '', '', '']);
   const [isSuggestingWhysDetail, setIsSuggestingWhysDetail] = useState(false);
+  const [isSuggestingSteps, setIsSuggestingSteps] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -242,8 +243,6 @@ export function IdeaDetail({
       immediate: reordered[0]?.text ?? idea.immediate,
     });
   };
-
-  const [isSuggestingSteps, setIsSuggestingSteps] = useState(false);
 
   const handleSuggestStepsAi = async () => {
     setIsSuggestingSteps(true);
