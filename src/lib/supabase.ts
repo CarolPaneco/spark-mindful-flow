@@ -382,7 +382,7 @@ export async function loadCompanyByCode(shareCode: string): Promise<Partial<Comp
       .from('companies')
       .select('*')
       .eq('share_code', cleanCode)
-      .single();
+      .maybeSingle();
 
     if (!error && data) {
       return {
@@ -401,6 +401,46 @@ export async function loadCompanyByCode(shareCode: string): Promise<Partial<Comp
   }
 
   return null;
+}
+
+/**
+ * Consulta solicitações de entrada pendentes feitas pelo próprio usuário
+ */
+export async function loadUserPendingRequests(userId?: string, userEmail?: string): Promise<CompanyJoinRequest[]> {
+  if (!userId && !userEmail) return [];
+  try {
+    let query = supabase
+      .from('company_join_requests')
+      .select('*')
+      .eq('status', 'pending');
+
+    if (userId && userEmail) {
+      query = query.or(`user_id.eq.${userId},user_email.eq.${userEmail.trim().toLowerCase()}`);
+    } else if (userId) {
+      query = query.eq('user_id', userId);
+    } else if (userEmail) {
+      query = query.eq('user_email', userEmail.trim().toLowerCase());
+    }
+
+    const { data, error } = await query;
+    if (!error && data) {
+      return data.map(r => ({
+        id: r.id,
+        companyId: r.company_id,
+        companyCode: r.company_code,
+        userId: r.user_id,
+        userName: r.user_name,
+        userEmail: r.user_email,
+        department: r.department,
+        role: r.role,
+        status: r.status,
+        createdAt: r.created_at,
+      }));
+    }
+  } catch (err) {
+    console.warn('Aviso ao consultar pedidos pendentes do usuário:', err);
+  }
+  return [];
 }
 
 /**

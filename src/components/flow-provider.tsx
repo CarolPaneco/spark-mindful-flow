@@ -286,8 +286,37 @@ export function FlowProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // Escuta em tempo real se o Key User aprovou a entrada do usuário na empresa
+    const membershipChannel = supabase
+      .channel('realtime:company_members')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'company_members' },
+        async () => {
+          const { data: { session } } = await supabase.auth.getSession();
+          const curr = session?.user;
+          if (curr) {
+            const userCompanies = await loadUserCompanies(curr.id, curr.email || undefined);
+            if (userCompanies.length > 0) {
+              setData(prev => {
+                const activeId = prev.activeCompanyId || prev.companyWorkspace?.id;
+                const chosenActive = userCompanies.find(c => c.id === activeId) || userCompanies[0];
+                return {
+                  ...prev,
+                  companies: userCompanies,
+                  companyWorkspace: chosenActive,
+                  activeCompanyId: chosenActive?.id,
+                };
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       subscription.unsubscribe();
+      supabase.removeChannel(membershipChannel);
     };
   }, []);
 
@@ -543,23 +572,33 @@ export function FlowProvider({ children }: { children: ReactNode }) {
 
     try {
       setIsSyncing(true);
-      // Valida se o código da empresa existe no Supabase
+      // Valida se o código da empresa realmente existe no Supabase
       const remoteCompany = await loadCompanyByCode(cleanCode);
-      if (!remoteCompany && cleanCode !== 'ACME-2026') {
-        toast.error(`Código corporativo "${cleanCode}" não foi encontrado. Verifique com o Key User.`);
+      if (!remoteCompany) {
+        toast.error(`Código corporativo "${cleanCode}" não foi encontrado. Nenhuma empresa existe com este código no sistema. Verifique com o Key User.`);
         return false;
       }
 
-      const companyId = remoteCompany?.id || `comp-${cleanCode.toLowerCase().replace('-', '_')}`;
-      const resolvedName = remoteCompany?.name || `Corporação (${cleanCode})`;
-      const companyIdeas = await loadCompanyIdeasFromSupabase(cleanCode);
+      // Se o usuário já faz parte desta empresa, apenas alterna
+      const isAlreadyActive = (data.companies || []).some(
+        c => c.id === remoteCompany.id || c.shareCode === cleanCode
+      );
+      if (isAlreadyActive) {
+        setData(prev => ({
+          ...prev,
+          workspaceMode: 'business',
+          activeCompanyId: remoteCompany.id,
+        }));
+        toast.success(`Alternado para o workspace da empresa "${remoteCompany.name}"! 🏢`);
+        return true;
+      }
 
-      // Registra a solicitação de entrada no Supabase para o Key User receber com nome e e-mail
+      // Registra a solicitação de entrada no Supabase para o Key User analisar e aprovar
       const applicantName = (user?.user_metadata as any)?.name || user?.email?.split('@')[0] || 'Colaborador(a)';
       const applicantEmail = user?.email || 'colaborador@empresa.com';
       await createCompanyJoinRequest({
         id: `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        companyId,
+        companyId: remoteCompany.id!,
         companyCode: cleanCode,
         userId: user?.id,
         userName: applicantName,
@@ -570,51 +609,15 @@ export function FlowProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
       });
 
-      const newJoinedCompany: CompanyWorkspace = {
-        id: companyId,
-        shareCode: cleanCode,
-        name: resolvedName,
-        industry: remoteCompany?.industry || 'Tecnologia & Inovação',
-        mission: remoteCompany?.mission || 'Crescimento e foco em entregas.',
-        sectors: defaultCompanySectors,
-        members: [
-          {
-            id: user?.id || `user-${Date.now()}`,
-            name: applicantName,
-            role: 'Colaborador(a)',
-            email: applicantEmail,
-            department: 'tech',
-            isKeyUser: false,
-            status: 'pending',
-          },
-        ],
-        keyUserName: remoteCompany?.keyUserName || 'Key User',
-        isKeyUser: false,
-      };
-
-      setData(prev => {
-        const existingCompanies = prev.companies || (prev.companyWorkspace ? [prev.companyWorkspace] : []);
-        const updatedCompanies = [
-          newJoinedCompany,
-          ...existingCompanies.filter(c => c.id !== newJoinedCompany.id),
-        ];
-        return {
-          ...prev,
-          workspaceMode: 'business',
-          companies: updatedCompanies,
-          companyWorkspace: newJoinedCompany,
-          activeCompanyId: newJoinedCompany.id,
-          ideas: [
-            ...companyIdeas,
-            ...prev.ideas.filter(i => !companyIdeas.some(ci => ci.id === i.id)),
-          ],
-        };
-      });
-
-      toast.success(`Pedido de adesão enviado ao Key User de ${resolvedName}! 🏢`);
+      // REGRA: NÃO abre a tela da empresa nem ativa o workspaceMode 'business'!
+      // O acesso à tela da empresa só é liberado quando o Key User aprovar ou ao criar uma nova empresa.
+      toast.info(
+        `Solicitação de adesão enviada para "${remoteCompany.name}"! ⏳ O acesso ao ambiente corporativo só será liberado após o Key User aprovar sua entrada.`,
+        { duration: 7000 }
+      );
       return true;
     } catch (err: any) {
-      toast.error(`Não foi possível conectar à empresa: ${err?.message || 'Código inválido'}`);
+      toast.error(`Não foi possível enviar a solicitação: ${err?.message || 'Código inválido'}`);
       return false;
     } finally {
       setIsSyncing(false);

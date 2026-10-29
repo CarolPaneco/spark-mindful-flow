@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Briefcase,
   X,
+  Clock,
 } from 'lucide-react';
 import {
   Dialog,
@@ -34,6 +35,7 @@ import {
   createCompanyJoinRequest,
   loadCompanyByCode,
   loadCompanyIdeasFromSupabase,
+  loadUserPendingRequests,
 } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -61,6 +63,16 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
   const [department, setDepartment] = useState('tech');
   const [role, setRole] = useState('Especialista / Colaborador');
   const [submittingJoin, setSubmittingJoin] = useState(false);
+  const [pendingUserRequests, setPendingUserRequests] = useState<CompanyJoinRequest[]>([]);
+
+  // Carrega pedidos pendentes que o próprio usuário fez
+  useEffect(() => {
+    if (open && (user?.id || user?.email)) {
+      void loadUserPendingRequests(user?.id, user?.email).then(reqs => {
+        setPendingUserRequests(reqs);
+      });
+    }
+  }, [open, user?.id, user?.email]);
 
   // Formulário: Criar Empresa (Key User)
   const [newCompanyName, setNewCompanyName] = useState('');
@@ -86,7 +98,7 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
     e.preventDefault();
     const cleanCode = shareCode.trim().toUpperCase();
     if (!cleanCode) {
-      toast.error('Informe o código da corporação.');
+      toast.error('Informe o código da empresa.');
       return;
     }
     if (!userName.trim()) {
@@ -97,23 +109,37 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
     try {
       setSubmittingJoin(true);
 
-      // 1. Tenta localizar a empresa no Supabase para validar o código
+      // 1. Tenta localizar a empresa no Supabase para validar se o código realmente existe
       const remoteCompany = await loadCompanyByCode(cleanCode);
-      if (!remoteCompany && cleanCode !== 'ACME-2026') {
-        toast.error(`Código "${cleanCode}" não foi encontrado. Verifique o código com o Key User da sua corporação.`);
+      if (!remoteCompany) {
+        toast.error(`Código corporativo "${cleanCode}" não foi encontrado. Nenhuma empresa existe com este código no sistema. Verifique o código com o Key User.`);
         return;
       }
-      const companyId = remoteCompany?.id || `comp-${cleanCode.toLowerCase().replace('-', '_')}`;
-      const resolvedName = remoteCompany?.name || `Corporação (${cleanCode})`;
 
-      // 2. Registra a solicitação de entrada
+      // Se o usuário já é membro ativo ou fundador desta empresa, ativa o workspace
+      const alreadyApproved = (data.companies || []).some(
+        c => c.id === remoteCompany.id || c.shareCode === cleanCode
+      );
+      if (alreadyApproved) {
+        setData(prev => ({
+          ...prev,
+          workspaceMode: 'business',
+          activeCompanyId: remoteCompany.id,
+        }));
+        toast.success(`Alternado para o workspace da empresa "${remoteCompany.name}"! 🏢`);
+        onOpenChange(false);
+        onSuccess?.();
+        return;
+      }
+
+      // 2. Registra a solicitação de entrada (status: 'pending')
       const request: CompanyJoinRequest = {
         id: `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        companyId,
+        companyId: remoteCompany.id!,
         companyCode: cleanCode,
         userId: user?.id,
         userName: userName.trim(),
-        userEmail: userEmail.trim() || 'colaborador@empresa.com',
+        userEmail: userEmail.trim() || user?.email || 'colaborador@empresa.com',
         department,
         role: role.trim() || 'Colaborador(a)',
         status: 'pending',
@@ -122,54 +148,14 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
 
       await createCompanyJoinRequest(request);
 
-      // 3. Carrega ideias da empresa se já existirem
-      const companyIdeas = await loadCompanyIdeasFromSupabase(cleanCode);
+      // Atualiza lista local de pedidos pendentes para visualização imediata
+      setPendingUserRequests(prev => [request, ...prev.filter(r => r.companyCode !== cleanCode)]);
 
-      // 4. Atualiza o estado local para entrar no workspace
-      const newJoinedComp = {
-        id: companyId,
-        shareCode: cleanCode,
-        name: resolvedName,
-        industry: remoteCompany?.industry || 'Tecnologia & Serviços',
-        mission: remoteCompany?.mission || 'Crescimento e excelência contínua.',
-        sectors: defaultCompanySectors,
-        members: [
-          {
-            id: user?.id || `user-${Date.now()}`,
-            name: userName.trim(),
-            role: role.trim(),
-            email: userEmail.trim(),
-            department,
-            isKeyUser: false,
-            status: 'pending' as const,
-          },
-        ],
-        keyUserName: remoteCompany?.keyUserName || 'Key User da Empresa',
-        isKeyUser: false,
-      };
-
-      setData(prev => {
-        const existingCompanies = prev.companies || (prev.companyWorkspace ? [prev.companyWorkspace] : []);
-        const updatedCompanies = [
-          newJoinedComp,
-          ...existingCompanies.filter(c => c.id !== newJoinedComp.id),
-        ];
-        return {
-          ...prev,
-          workspaceMode: 'business',
-          companies: updatedCompanies,
-          companyWorkspace: newJoinedComp,
-          activeCompanyId: newJoinedComp.id,
-          ideas: [
-            ...companyIdeas,
-            ...prev.ideas.filter(i => !companyIdeas.some(ci => ci.id === i.id)),
-          ],
-        };
-      });
-
-      toast.success(
-        `Pedido de acesso enviado com sucesso ao Key User de "${resolvedName}"! 🎉`,
-        { duration: 4000 }
+      // REGRA: NÃO abre a tela da empresa nem altera workspaceMode!
+      // A tela da empresa SÓ abre quando o Key User aprovar ou quando criar uma nova empresa.
+      toast.info(
+        `Solicitação enviada com sucesso para "${remoteCompany.name}"! ⏳ O ambiente corporativo só será liberado após o Key User aprovar sua entrada.`,
+        { duration: 7000 }
       );
       onOpenChange(false);
       onSuccess?.();
@@ -289,14 +275,29 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
           {/* TAB 1: ENTRAR COM CÓDIGO (COLABORADOR) */}
           {tab === 'join' && (
             <form onSubmit={handleJoinWithCode} className="space-y-4">
+              {pendingUserRequests.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-xs animate-in fade-in-50">
+                  <Clock size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <p className="font-semibold text-foreground">Solicitação de Entrada em Análise ⏳</p>
+                    <p className="text-muted-foreground mt-0.5">
+                      Você possui uma solicitação pendente para o código{' '}
+                      <strong className="font-mono text-foreground font-bold">{pendingUserRequests[0]?.companyCode}</strong>.
+                      A tela corporativa será desbloqueada assim que o Key User aprovar sua solicitação.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="p-3.5 rounded-xl bg-violet-500/10 border border-violet-500/25 flex items-start gap-3">
                 <KeyRound size={18} className="text-violet-500 shrink-0 mt-0.5" />
                 <div className="text-xs text-muted-foreground leading-relaxed">
-                  <p className="font-semibold text-foreground">Acesso por Código de Corporação</p>
+                  <p className="font-semibold text-foreground">Acesso Controlado por Código de Empresa</p>
                   <p className="mt-0.5">
-                    Digite o código fornecido pelo <strong>Key User</strong> da sua empresa (ex:{' '}
-                    <code className="text-primary font-mono font-bold">ACME-2026</code>) para ingressar
-                    no funil corporativo compartilhado.
+                    Informe o código oficial fornecido pelo <strong>Key User</strong> da sua organização. O sistema validará se a empresa existe e registrará seu pedido de adesão.
+                  </p>
+                  <p className="mt-1 text-amber-500 font-medium">
+                    ⚠️ A tela da empresa só será aberta após o Key User aprovar seu ingresso.
                   </p>
                 </div>
               </div>
@@ -308,7 +309,7 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
                 <input
                   type="text"
                   required
-                  placeholder="Ex: ACME-2026"
+                  placeholder="Ex: INNOVA-2026"
                   value={shareCode}
                   onChange={e => setShareCode(e.target.value.toUpperCase())}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-secondary/40 text-foreground font-mono font-bold text-sm tracking-wider uppercase focus:outline-none focus:ring-2 focus:ring-violet-500/40"
@@ -385,8 +386,8 @@ export function CompanyAccessModal({ open, onOpenChange, onSuccess, initialTab =
                   <Send size={14} className={submittingJoin ? 'animate-spin' : ''} />
                   <span>
                     {submittingJoin
-                      ? 'Enviando pedido ao Key User...'
-                      : 'Enviar Pedido ao Key User & Entrar'}
+                      ? 'Enviando solicitação ao Key User...'
+                      : 'Enviar Solicitação de Entrada ao Key User'}
                   </span>
                 </Button>
               </div>
